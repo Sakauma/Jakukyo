@@ -1,0 +1,21 @@
+.response-feedback{font-size:13px;line-height:1.5}
+.response-feedback>strong,.response-feedback-heading>strong{color:var(--gold);font-size:14px;font-weight:600}
+.response-feedback-heading{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.response-feedback-heading>span{color:var(--muted);font-size:12px}
+.response-feedback-blocked .response-feedback-heading>strong{color:#e8b49d}
+.response-feedback p{margin:4px 0 0;color:var(--cream);font-size:14px;line-height:1.5}
+.response-help{margin:5px 0 0;padding:0;background:none;color:var(--gold);border:0;font-size:12px}
+.game-shell>.play-dock{flex:0 0 118px;height:118px;min-height:118px;max-height:118px}
+.play-dock>.turn-prompt{min-width:0;max-width:450px;max-height:100%;overflow-y:auto;overscroll-behavior:contain}
+.play-dock>.response-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;max-width:44%;min-width:0;margin-left:auto}
+.game-actions>.discard-button{width:174px;min-width:174px;max-width:174px;flex:0 0 174px;justify-content:space-between;white-space:nowrap}
+.game-actions>.riichi-action{width:86px;min-width:86px;max-width:86px;flex:0 0 86px;white-space:nowrap}
+.response-actions>.game-actions{max-width:none;min-width:0;flex:1;max-height:98px;overflow-y:auto}
+.response-actions>.game-actions:empty{display:none}
+.response-actions>.win-actions{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.win-actions>.action-button{min-width:66px;min-height:52px;font-weight:600}
+.table-area>.table-caption{pointer-events:none}
+.table-area>.river-selection-count{display:flex;gap:9px;align-items:center;font-family:inherit;font-size:12px;letter-spacing:0;color:var(--cream);opacity:1}
+.river-selection-count>strong{font-weight:500;color:var(--gold)}
+@media(max-width:1100px){.play-dock>.response-actions{max-width:42%}}
+@media(max-width:820px){.play-dock>.response-actions{max-width:38%}.win-actions>.action-button{min-width:60px;padding:10px 8px}.response-feedback-heading{gap:3px 7px}}

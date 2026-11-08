@@ -1,0 +1,24 @@
+.table-area>.riichi-assist{position:absolute;top:18px;right:26px;z-index:3;display:flex;flex-direction:column;gap:6px;width:max-content;max-width:min(300px,calc(50% - 100px));max-height:calc(40% - 30px);padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;background:color-mix(in srgb,var(--panel) 94%,transparent);color:var(--cream);box-shadow:0 5px 16px #0002;pointer-events:none}
+.assist-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;line-height:18px}
+.assist-summary>span{font-size:11px;color:var(--muted)}
+.assist-summary>strong{font-size:14px;font-weight:500;letter-spacing:1px;color:var(--gold);white-space:nowrap}
+.assist-wait-area{min-width:0}
+.assist-waits{display:flex;flex-wrap:wrap;align-items:center;gap:4px;list-style:none;padding:0;margin:0}
+.assist-waits>li{display:flex;align-items:center;gap:4px;flex-shrink:0;padding:1px 4px 1px 2px;border:1px solid var(--border-color);border-radius:5px;background:color-mix(in srgb,var(--surface) 62%,transparent)}
+.assist-waits .tile-portrait{--tile-width:23px}
+.assist-waits>li>span{display:flex;flex-direction:column;gap:2px}
+.assist-waits b{color:var(--cream);font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.1}
+.assist-waits em{font-size:10px;line-height:1.1;font-style:normal;color:var(--muted);white-space:nowrap}
+.assist-waits .has-yaku em{color:var(--gold)}
+.assist-waits .is-exhausted{opacity:.44}
+.has-many-waits .assist-waits>li{gap:3px;padding:0 2px;border:0;background:transparent}
+.has-many-waits .assist-waits .tile-portrait{--tile-width:18px}
+.has-many-waits .assist-waits b{font-size:12px}
+.assist-status{display:flex;flex-direction:column;gap:3px;min-width:0;border-top:1px solid var(--border-color);padding-top:5px;line-height:18px}
+.assist-status>strong{font-size:13px;font-weight:600;color:var(--cream)}
+.assist-status.has-yaku>strong{color:var(--gold)}
+.assist-status>span{font-size:12px;color:#eab2a5}
+.table-tools .assist-quick{color:var(--muted);font-size:11px;gap:5px;padding:0 5px}
+.table-tools .assist-quick.is-on{color:var(--gold)}
+.assist-quick i{display:block;width:5px;height:5px;border-radius:50%;background:currentColor}
+@media(max-width:1100px){.table-area>.riichi-assist{top:14px;right:14px;max-height:calc(40% - 28px)}}
