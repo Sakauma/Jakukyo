@@ -36,6 +36,8 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
   const [gesture] = useState(() => createHandDragController(HAND_ROW_Z - .60));
   const drag = useRef<HandDragPreview | null>(null), released = useRef<[number, number, number] | null>(null);
   const captured = useRef<{ pointerId: number; target: { releasePointerCapture: (id: number) => void } } | null>(null);
+  const capturedWatch = useRef<{ cleanup: () => void } | null>(null);
+  const fallbackTap = useRef<{ cleanup: () => void } | null>(null);
   const suppressClick = useRef(false);
   const materials = useMemo(() => tileMaterials(theme, tile, faded), [tile, theme, faded]);
   const lying = Math.abs(rotation[0]) > 1;
@@ -57,9 +59,51 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
     const capture = captured.current; captured.current = null;
     try { capture?.target.releasePointerCapture(capture.pointerId); } catch { /* Capture may already be lost. */ }
   };
+  const stopCapturedWatch = () => { capturedWatch.current?.cleanup(); capturedWatch.current = null; };
+  const stopFallbackTap = (suppress: boolean) => {
+    const fallback = fallbackTap.current; fallbackTap.current = null;
+    if (fallback) { fallback.cleanup(); if (suppress) suppressClick.current = true; }
+  };
+  const beginFallbackTap = (pointerId: number, clientX: number, clientY: number) => {
+    // Without pointer capture, retain taps but never turn an interrupted drag into a click.
+    gesture.cancel();
+    let moved = false;
+    const move = (event: PointerEvent) => {
+      if (event.pointerId === pointerId && Math.hypot(event.clientX - clientX, event.clientY - clientY) >= 8) moved = true;
+    };
+    const up = (event: PointerEvent) => {
+      if (event.pointerId === pointerId) stopFallbackTap(moved || Math.hypot(event.clientX - clientX, event.clientY - clientY) >= 8);
+    };
+    const cancel = (event: PointerEvent) => { if (event.pointerId === pointerId) stopFallbackTap(true); };
+    const blur = () => stopFallbackTap(true);
+    const cleanup = () => {
+      window.removeEventListener('pointermove', move, true); window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', cancel, true); window.removeEventListener('blur', blur);
+    };
+    fallbackTap.current = { cleanup };
+    window.addEventListener('pointermove', move, true); window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', cancel, true); window.addEventListener('blur', blur);
+  };
   const cancelGesture = () => {
     if (gesture.isActive() || drag.current) suppressClick.current = true;
-    gesture.cancel(); drag.current = null; setDragging(false); setDropValid(false); handInput?.onPreview(null); releaseCapture();
+    stopFallbackTap(true); stopCapturedWatch(); gesture.cancel(); drag.current = null; setDragging(false); setDropValid(false); handInput?.onPreview(null); releaseCapture();
+  };
+  const watchCapture = (pointerId: number) => {
+    let lostFrame: number | null = null;
+    const cancel = (event: PointerEvent) => { if (event.pointerId === pointerId) cancelGesture(); };
+    const lost = (event: PointerEvent) => {
+      if (event.pointerId !== pointerId || lostFrame !== null) return;
+      // Some browsers send this before pointerup; allow that event to finish first.
+      lostFrame = requestAnimationFrame(() => { lostFrame = null; if (gesture.isActive()) cancelGesture(); });
+    };
+    const blur = () => cancelGesture();
+    const cleanup = () => {
+      window.removeEventListener('pointercancel', cancel, true); window.removeEventListener('lostpointercapture', lost, true);
+      window.removeEventListener('blur', blur); if (lostFrame !== null) cancelAnimationFrame(lostFrame);
+    };
+    capturedWatch.current = { cleanup };
+    window.addEventListener('pointercancel', cancel, true); window.addEventListener('lostpointercapture', lost, true);
+    window.addEventListener('blur', blur);
   };
   useLayoutEffect(() => { cancelGesture(); if (!interactive) setHover(false); }, [dragKey, interactive]);
   useEffect(() => {
@@ -70,7 +114,7 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
   useEffect(() => {
     const hide = () => { if (document.hidden) cancelGesture(); };
     if (handInput) document.addEventListener('visibilitychange', hide);
-    return () => { gesture.cancel(); handInput?.onPreview(null); releaseCapture(); document.removeEventListener('visibilitychange', hide); };
+    return () => { stopFallbackTap(true); stopCapturedWatch(); gesture.cancel(); handInput?.onPreview(null); releaseCapture(); document.removeEventListener('visibilitychange', hide); };
   }, []);
   useLayoutEffect(() => {
     if (!ref.current || !positionRef.current) return;
@@ -124,13 +168,19 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
       onPointerOver={event => { event.stopPropagation(); setHover(true); }}
       onPointerOut={() => { if (!gesture.isActive()) setHover(false); }}
       onPointerDown={event => {
-        if (event.button !== 0) return; event.stopPropagation(); suppressClick.current = false;
+        if (event.button !== 0 || event.isPrimary === false) return; event.stopPropagation(); stopFallbackTap(true); suppressClick.current = false;
         if (gesture.begin(event.pointerId, pointerPoint(event), [position[0], position[2] + HAND_ROW_Z], handInput?.context ?? null)) {
           const target = event.target as (EventTarget & { setPointerCapture?: (id: number) => void; releasePointerCapture?: (id: number) => void }) | null;
           if (target && typeof target.setPointerCapture === 'function' && typeof target.releasePointerCapture === 'function') {
-            try { target.setPointerCapture(event.pointerId); captured.current = { pointerId: event.pointerId, target: { releasePointerCapture: target.releasePointerCapture.bind(target) } }; }
-            catch { cancelGesture(); }
-          } else cancelGesture();
+            try {
+              target.setPointerCapture(event.pointerId); captured.current = { pointerId: event.pointerId, target: { releasePointerCapture: target.releasePointerCapture.bind(target) } };
+              watchCapture(event.pointerId);
+            } catch {
+              // R3F can register its capture before the underlying DOM call throws.
+              try { target.releasePointerCapture(event.pointerId); } catch { /* Already released or unavailable. */ }
+              beginFallbackTap(event.pointerId, event.clientX, event.clientY);
+            }
+          } else beginFallbackTap(event.pointerId, event.clientX, event.clientY);
         }
       }}
       onPointerMove={event => {
@@ -142,7 +192,7 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
       onPointerUp={event => {
         if (!gesture.isActive()) return; event.stopPropagation();
         const result = gesture.finish(event.pointerId, pointerPoint(event), handInput?.context ?? null);
-        suppressClick.current = result.kind !== 'tap'; drag.current = null; setDragging(false); setDropValid(false); handInput?.onPreview(null); releaseCapture();
+        suppressClick.current = result.kind !== 'tap'; stopCapturedWatch(); drag.current = null; setDragging(false); setDropValid(false); handInput?.onPreview(null); releaseCapture();
         if (result.kind !== 'tap') setHover(false);
         if (result.kind === 'commit') {
           const pose: [number, number, number] = [result.preview.position[0], restY + .8, result.preview.position[1]];
@@ -324,7 +374,7 @@ function ContextMonitor({ onFailure, onRestore }: { onFailure: () => void; onRes
 
 export default function MahjongTable(props: Omit<SceneProps, 'theme'> & { theme?: TableTheme; onFailure: () => void; onRestore?: () => void }) {
   const theme = props.theme ?? getTheme();
-  return <Canvas shadows="soft" camera={{ position: [0, 9, 11.8], fov: 43, near: .1, far: 100 }} dpr={[1, 1.5]} gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }} onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = theme.exposure; }} fallback={<div className="webgl-fallback">当前浏览器无法创建 WebGL 3D 场景，请使用启用硬件加速的 Edge 或 Chrome。</div>}>
+  return <Canvas style={{ touchAction: 'none' }} shadows="soft" camera={{ position: [0, 9, 11.8], fov: 43, near: .1, far: 100 }} dpr={[1, 1.5]} gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }} onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = theme.exposure; }} fallback={<div className="webgl-fallback">当前浏览器无法创建 WebGL 3D 场景，请使用启用硬件加速的 Edge 或 Chrome。</div>}>
     <ContextMonitor onFailure={props.onFailure} onRestore={props.onRestore} /><Suspense fallback={null}><Scene {...props} theme={theme} /></Suspense>
   </Canvas>;
 }
