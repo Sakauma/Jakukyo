@@ -11,7 +11,7 @@ async function findPackage(name, start) {
   }
 }
 
-export async function collectLicenses(root) {
+export async function collectLicenses(root, { electronRuntime = true } = {}) {
   const source = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
   const tileDirectory = join(root, 'src', 'table', 'assets', 'tiles');
   let tileSource, tileLicense;
@@ -44,5 +44,5 @@ export async function collectLicenses(root) {
     sections.push(`\n${'='.repeat(72)}\n${key}\nLicense: ${JSON.stringify(pkg.info.license ?? 'See package notices')}\nSource: ${typeof pkg.info.repository === 'string' ? pkg.info.repository : pkg.info.repository?.url ?? pkg.info.homepage ?? ''}\n\n${notices.join('\n\n')}`);
     for (const name of Object.keys(pkg.info.dependencies ?? {})) queue.push({ name, from: pkg.directory });
   }
-  return `Third-party notices for Jakukyo\nIncludes bundled tile artwork attribution and licenses.\nConservatively includes production dependency packages, including portions not emitted by the browser bundler.\nElectron and Chromium notices are shipped separately in the runtime folder.\n${sections.sort().join('\n')}`;
+  return `Third-party notices for Jakukyo\nIncludes bundled tile artwork attribution and licenses.\nConservatively includes production dependency packages, including portions not emitted by the browser bundler.\n${electronRuntime ? 'Electron and Chromium notices are shipped separately in the runtime folder.\n' : ''}${sections.sort().join('\n')}`;
 }

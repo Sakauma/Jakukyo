@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
+    "build:offline": "tsc --noEmit && node scripts/offline-build.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "package:windows:wsl": "wsl.exe -d ubuntu2004 -- bash /mnt/d/unfixed/majiang/scripts/package-wsl.sh"
   },

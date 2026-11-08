@@ -1,3 +1,4 @@
+import InlineBotWorker from './worker?worker&inline';
 import { chooseRiichiAction } from './riichi';
 import type { BotAction, BotDecision, BotObservation, Difficulty } from './types';
 import { AI_VERSION } from './types';
@@ -22,7 +23,7 @@ export class BotDecisionService {
     if (typeof Worker === 'undefined' || this.unavailable) return Promise.resolve(chooseRiichiAction(observation, actions, difficulty, aiVersion));
     try {
       if (!this.worker) {
-        this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+        this.worker = new InlineBotWorker();
         this.worker.onmessage = event => {
           const job = this.jobs.get(event.data.id);
           if (!job) return;
