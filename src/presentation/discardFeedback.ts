@@ -13,7 +13,7 @@ export interface DiscardFeedbackEvent {
 }
 
 export const discardFeedbackScope = (snapshot: GameSnapshot) => JSON.stringify([snapshot.mode, snapshot.seed,
-  snapshot.round.wind, snapshot.round.hand, snapshot.round.honba, snapshot.round.dealer]);
+  snapshot.round.wind, snapshot.round.hand, snapshot.round.honba, snapshot.round.dealer, snapshot.round.sequence]);
 
 /** Reads actual public discard cues; failed inputs and logs cannot create an event. */
 export function createDiscardFeedbackTracker() {

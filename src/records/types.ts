@@ -64,6 +64,23 @@ export interface HistoryHand {
   winPointSum: number;
   pricedWins: number;
 }
+/** Bounded summary for one continuing game; completed hands need no stored tiles. */
+export interface EndlessHistoryTotals {
+  settledHands: number;
+  wonHands: number;
+  dealInHands: number;
+  winEvents: number;
+  dealInEvents: number;
+  riichiHands: number;
+  openMeldHands: number;
+  winPointSum: number;
+  pricedWins: number;
+}
+export interface EndlessHistory {
+  through: number;
+  totals: EndlessHistoryTotals;
+  lastHand: HistoryHand;
+}
 export interface PlayedHistory {
   id: string;
   mode: ModeId;
@@ -72,4 +89,6 @@ export interface PlayedHistory {
   completed: boolean;
   finalRanks?: number[];
   hands: HistoryHand[];
+  /** Endless sessions aggregate settled hands instead of growing a per-hand ledger. */
+  endless?: EndlessHistory;
 }

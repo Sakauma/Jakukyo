@@ -44,6 +44,8 @@ export interface RoundView {
   wind: string;
   hand: number;
   honba: number;
+  /** Distinguishes repeated wind cycles and consecutive hands in endless matches. */
+  sequence?: number;
   riichiSticks: number;
   tilesLeft: number;
   doraIndicators: TileCode[];
@@ -129,6 +131,12 @@ export interface RonNotice {
   active: boolean;
   reasons: string[];
 }
+/** Reason a completed hand on the player's actual draw could not self-draw win. */
+export interface SelfWinNotice {
+  id: string;
+  tile: TileCode;
+  reasons: string[];
+}
 export interface GameSnapshot {
   status: 'ready' | 'playing' | 'roundEnd' | 'matchEnd';
   phase: 'waiting' | 'discard' | 'response' | 'settlement' | 'exchange' | 'void';
@@ -144,6 +152,7 @@ export interface GameSnapshot {
   /** Most recent confirmed, public win; cleared on the next deal. */
   latestWin?: ConfirmedWinEvent;
   ronNotice?: RonNotice;
+  selfWinNotice?: SelfWinNotice;
   autoPlay: boolean;
   /** Human-only autoplay strategy; opponents keep difficulty. */
   autoPlayDifficulty?: Difficulty;
@@ -180,13 +189,26 @@ export interface SessionOptions {
   autoExchangeThree?: boolean;
   quickControls?: Partial<QuickControls>;
   /** Defaults to a hanchan; single-hand mode is useful for tests and practice. */
-  matchLength?: 'hanchan' | 'east' | 'single';
+  matchLength?: 'hanchan' | 'east' | 'single' | 'endless';
 }
 export interface ReplayDecision { key: string }
+/** Public round-start state sufficient to resume one deterministic endless hand. */
+export interface EndlessCheckpoint {
+  version: 1;
+  /** Unique game identity, stable across hands and resumed sessions. */
+  sessionId: string;
+  sequence: number;
+  points: number[];
+  dealer: number;
+  rotation: number;
+  honba: number;
+  sticks: number;
+}
 export interface SavedGame {
   version: 1;
   seed: string;
-  matchLength: 'hanchan' | 'east' | 'single';
+  matchLength: 'hanchan' | 'east' | 'single' | 'endless';
+  checkpoint?: EndlessCheckpoint;
   decisions: ReplayDecision[];
   mode?: ModeId;
   /** Initial balance, not current points or scoring stakes; absent means the old table default. */
@@ -212,6 +234,8 @@ export type GameSessionAPI = RiichiSessionAPI;
 export interface ReplayData extends SavedGame { rules: Record<string, unknown>; log: unknown }
 export interface RiichiSessionAPI {
   getSnapshot(): GameSnapshot;
+  /** On-demand shape-only preview for a currently legal regional discard. */
+  getRegionalHint?(discardId: string): { shanten: number | null; waits: TileCode[] } | null;
   subscribe(listener: () => void): () => void;
   dispatch(actionId: string): boolean;
   newGame(options?: SessionOptions): void;

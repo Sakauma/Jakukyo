@@ -32,6 +32,13 @@ export function summarizeStatistics(summaries: readonly PlayedHistory[]): Statis
         group.rankedMatches++; group.rankSum += rank; group.rankCounts[rank - 1]++;
       }
     }
+    if (record.endless) {
+      const totals = record.endless.totals;
+      group.settledHands += totals.settledHands; group.wonHands += totals.wonHands; group.dealInHands += totals.dealInHands;
+      group.winEvents += totals.winEvents; group.dealInEvents += totals.dealInEvents;
+      group.riichiHands += totals.riichiHands; group.openMeldHands += totals.openMeldHands;
+      group.winPointSum += totals.winPointSum; group.pricedWins += totals.pricedWins;
+    }
     for (const hand of record.hands) {
       const handKey = `${record.id}:${hand.key}`;
       if (seenRounds.has(handKey)) continue;

@@ -2,7 +2,7 @@ import type { Difficulty, BotObservation, GenericCandidate } from '../ai/types';
 import { AI_VERSION, validDifficulty } from '../ai/types';
 import { rankPublicCandidates, samplePublicDraws } from '../ai/evaluator';
 import { getMode } from '../catalog';
-import type { ConfirmedWinEvent, GameLogEntry, GameSessionAPI, GameSnapshot, LegalAction, MeldView, ModeId, QuickControls, ReplayData, ReplayFrame, RonNotice, RoundResult, SavedGame, SessionOptions, WinnerView } from '../types';
+import type { ConfirmedWinEvent, EndlessCheckpoint, GameLogEntry, GameSessionAPI, GameSnapshot, LegalAction, MeldView, ModeId, QuickControls, ReplayData, ReplayFrame, RonNotice, RoundResult, SavedGame, SelfWinNotice, SessionOptions, WinnerView } from '../types';
 import { decompose, shanten } from './hand';
 import { getProfile, isBurstReady, nextWildcard, profileTiles, scoreHand } from './rules';
 import type { HandScore, RuleProfile, ScoreContext, ScoringPlayer } from './rules';
@@ -13,6 +13,7 @@ import { appendReplayFrame, finishReplayFrames, MAX_REPLAY_STEPS, validateReplay
 import { furitenView } from '../assist/furiten';
 import { furitenReasons } from '../ronNotice';
 import { restoredStartPoints, validStartPoints } from '../startingPoints';
+import { newEndlessSessionId } from '../endlessCheckpoint';
 
 interface Player extends ScoringPlayer {
   id:number;points:number;drawn:string|null;discards:GameSnapshot['players'][number]['discards'];
@@ -25,7 +26,7 @@ const NAMES=['你','青岚','千鹤','北辰'];
 let displaySessionSequence=0;
 
 export class RegionalSession implements GameSessionAPI {
-  private options:SessionOptions&{seed:string;mode:ModeId;difficulty:Difficulty;startPoints:number;autoPlayDifficulty:Difficulty;autoExchangeThree:boolean;speed:number;autoPlay:boolean;matchLength:'single'|'east'|'hanchan'};
+  private options:SessionOptions&{seed:string;mode:ModeId;difficulty:Difficulty;startPoints:number;autoPlayDifficulty:Difficulty;autoExchangeThree:boolean;speed:number;autoPlay:boolean;matchLength:'single'|'east'|'hanchan'|'endless'};
   private profile:RuleProfile;
   private players:Player[]=[];
   private wall:string[]=[];
@@ -39,6 +40,9 @@ export class RegionalSession implements GameSessionAPI {
   private turn=0;
   private dealer=0;
   private roundNumber=0;
+  private handSequence=0;
+  private endlessSessionId='';
+  private checkpoint?:EndlessCheckpoint;
   private honba=0;
   private sticks=0;
   private kanCount=0;
@@ -48,6 +52,8 @@ export class RegionalSession implements GameSessionAPI {
   private result:RoundResult|null=null;
   private latestWin?:ConfirmedWinEvent;
   private ronNotice?:RonNotice;
+  private selfWinNotice?:SelfWinNotice;
+  private selfWinNoticeSequence=0;
   private ronEventSequence=0;
   private readonly displaySessionId=++displaySessionSequence;
   private winEventSequence=0;
@@ -70,6 +76,7 @@ export class RegionalSession implements GameSessionAPI {
   private replaying=false;
   private aiVersion=AI_VERSION;
   private step=0;
+  private regionalHintCache?:{key:string;shanten:number|null;waits:string[]};
 
   constructor(options:SessionOptions={}){
     const mode=options.mode||'guangdong';
@@ -87,17 +94,28 @@ export class RegionalSession implements GameSessionAPI {
   private nextActive(id:number){for(let n=1;n<=this.profile.players;n++){const next=(id+n)%this.profile.players;if(!this.players[next].hasWon||this.profile.continuing!=='blood')return next;}return id;}
   private active(){return this.players.filter(p=>!p.hasWon||this.profile.continuing!=='blood');}
   private makePlayer(id:number):Player{return {id,points:this.options.startPoints,hand:[],melds:[],flowers:[],kita:0,riichi:false,drawn:null,discards:[],hasWon:false,winCount:0,temporaryFuriten:false,permanentFuriten:false,lastDrawKan:false,canSelfWin:true,floatCount:0};}
-  newGame(options:SessionOptions={}){
+  newGame(options:SessionOptions={}){this.initialize(options);}
+  private initialize(options:SessionOptions,checkpoint?:EndlessCheckpoint){
     if(!this.replaying)this.aiVersion=AI_VERSION;
     this.quickControls=updateQuickControls(this.quickControls,options.quickControls);
     this.cancel();const mode=options.mode||this.options.mode;this.profile=getProfile(mode);if(!this.profile)throw new Error('未实现的规则');
     this.options={...this.options,...options,mode,seed:options.seed||this.options.seed,startPoints:validStartPoints(mode,options.startPoints)?options.startPoints:this.profile.startPoints,autoPlayDifficulty:validDifficulty(options.autoPlayDifficulty)?options.autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:options.autoExchangeThree??this.options.autoExchangeThree};
-    this.random=seededRandom(this.options.seed);this.dealer=0;this.roundNumber=0;this.honba=0;this.sticks=0;this.disposed=false;this.step=0;this.decisions=[];this.logs=[];this.logSequence=0;
-    this.players=Array.from({length:this.profile.players},(_,id)=>this.makePlayer(id));this.deal();this.publish();this.schedule();
+    if(this.options.matchLength!=='endless')checkpoint=undefined;
+    this.random=seededRandom(this.options.seed);this.dealer=checkpoint?.dealer??0;this.roundNumber=checkpoint?.rotation??0;this.handSequence=checkpoint?checkpoint.sequence-1:0;this.honba=checkpoint?.honba??0;this.sticks=checkpoint?.sticks??0;this.disposed=false;this.step=0;this.decisions=[];this.logs=[];this.logSequence=0;this.regionalHintCache=undefined;
+    this.endlessSessionId=this.options.matchLength==='endless'?(checkpoint?.sessionId??newEndlessSessionId()):'';this.checkpoint=undefined;
+    this.players=Array.from({length:this.profile.players},(_,id)=>this.makePlayer(id));
+    if(checkpoint)this.players.forEach((player,id)=>{player.points=checkpoint.points[id];});
+    this.deal();this.publish();this.schedule();
   }
   private deal(){
-    const points=this.players.map(p=>p.points);this.players=points.map((points,id)=>({...this.makePlayer(id),points}));
-    this.roundStart=[...points];this.roundWinners=[];this.kongTransfers=[];this.result=null;this.latestWin=undefined;this.ronNotice=undefined;this.response=null;this.actions=[];this.kanCount=0;this.callsMade=false;this.exchangeSelection.clear();
+    this.handSequence++;this.regionalHintCache=undefined;
+    const points=this.players.map(p=>p.points);
+    if(this.options.matchLength==='endless'){
+      this.checkpoint={version:1,sessionId:this.endlessSessionId,sequence:this.handSequence,points:[...points],dealer:this.dealer,rotation:this.roundNumber,honba:this.honba,sticks:this.sticks};
+      this.random=seededRandom(`${this.options.seed}|endless:${this.handSequence}`);this.decisions=[];this.step=0;
+    }
+    this.players=points.map((points,id)=>({...this.makePlayer(id),points}));
+    this.roundStart=[...points];this.roundWinners=[];this.kongTransfers=[];this.result=null;this.latestWin=undefined;this.ronNotice=undefined;this.selfWinNotice=undefined;this.response=null;this.actions=[];this.kanCount=0;this.callsMade=false;this.exchangeSelection.clear();
     this.wall=shuffle(profileTiles(this.profile),this.random);this.replacement=[];this.dora=[];this.ura=[];this.doraReserve=[];this.uraReserve=[];this.wildcard=undefined;
     if(this.profile.id==='sanma'){
       const dead=this.wall.splice(0,14);this.replacement=dead.slice(0,4);this.doraReserve=dead.slice(4,9);this.uraReserve=dead.slice(9,14);this.dora.push(this.doraReserve[0]);this.ura.push(this.uraReserve[0]);
@@ -123,12 +141,12 @@ export class RegionalSession implements GameSessionAPI {
   }
   private draw(replacement=false,kan=false){
     const player=this.players[this.turn];player.temporaryFuriten=false;player.lastDrawKan=false;
-    if(player.id===0)this.ronNotice=undefined;
+    if(player.id===0){this.ronNotice=undefined;this.selfWinNotice=undefined;}
     const tile=this.takeTile(player,replacement,kan);if(!tile){this.finishDraw();return;}
     player.hand=sortTiles(player.hand);player.hand.push(tile);player.drawn=tile;player.canSelfWin=true;this.stage='discard';this.actions=this.ownChoices(player);
     if(!this.actions.length)throw new Error(`没有合法出牌：${this.profile.id}`);
   }
-  private action(type:Choice['type'],key:string,label:string,extra:Partial<Choice>={}):Choice{return {id:`${this.step}:${key}`,key,type,label,...extra};}
+  private action(type:Choice['type'],key:string,label:string,extra:Partial<Choice>={}):Choice{return {id:`${this.options.matchLength==='endless'?`${this.handSequence}:`:''}${this.step}:${key}`,key,type,label,...extra};}
   private exchangeActions(){
     const player=this.players[0];this.actions=player.hand.map((tile,index)=>this.action('exchange',`exchange:${index}`,`${this.exchangeSelection.has(index)?'取消':'选'}${tileLabel(tile)}`,{tile,tileId:this.handId(0,index),index}));
     const selected=[...this.exchangeSelection];if(selected.length===3&&new Set(selected.map(i=>player.hand[i][0])).size===1)this.actions.push(this.action('confirm','confirm-exchange','确认换三张'));
@@ -164,9 +182,28 @@ export class RegionalSession implements GameSessionAPI {
   }
   private isFuriten(player:Player){return player.temporaryFuriten||player.permanentFuriten||this.shapeWaits(player).some(tile=>player.discards.some(d=>norm(d.tile)===tile));}
   private handId(id:number,index:number){return `${id}-tile-${index}`;}
+  getRegionalHint(discardId:string):{shanten:number|null;waits:string[]}|null{
+    if(this.disposed||this.profile.id==='sanma'||this.stage!=='discard'||this.turn!==0)return null;
+    const player=this.players[0];
+    if(player.hasWon&&this.profile.continuing==='blood')return null;
+    const choice=this.actions.find(action=>action.type==='discard'&&action.tileId===discardId);
+    if(choice?.index==null||choice.index<0||choice.index>=player.hand.length)return null;
+    const key=JSON.stringify([this.profile.id,this.wildcard,player.hand,player.melds,choice.index]);
+    if(this.regionalHintCache?.key===key)return {shanten:this.regionalHintCache.shanten,waits:[...this.regionalHintCache.waits]};
+    const after=player.hand.filter((_,index)=>index!==choice.index),distance=this.distance(after,player.melds);
+    const hint={key,shanten:Number.isFinite(distance)?distance:null,waits:distance===0?this.shapeWaits(player,after):[]};
+    this.regionalHintCache=hint;
+    return {shanten:hint.shanten,waits:[...hint.waits]};
+  }
   private ownChoices(player:Player):Choice[]{
     const choices:Choice[]=[];const drawn=player.drawn;
-    if(drawn&&player.canSelfWin&&this.winning(player,drawn,true))choices.push(this.action('tsumo','tsumo','自摸和牌'));
+    if(player.id===0)this.selfWinNotice=undefined;
+    if(drawn&&player.canSelfWin){
+      const reasons:string[]=[];
+      const score=this.winning(player,drawn,true,false,false,player.id===0?reasons:undefined);
+      if(score)choices.push(this.action('tsumo','tsumo','自摸和牌'));
+      else if(player.id===0&&reasons.length)this.selfWinNotice={id:`regional:${this.displaySessionId}:self:${++this.selfWinNoticeSequence}`,tile:drawn,reasons};
+    }
     if(this.profile.id==='sanma'&&drawn&&this.wall.length&&player.hand.some(t=>t==='z4')&&(!player.riichi||drawn==='z4'))choices.push(this.action('kita','kita','拔北',{tile:'z4'}));
     const mustVoid=!!player.voidSuit&&player.hand.some(t=>t[0]===player.voidSuit);
     if(drawn&&this.wall.length>0&&(!mustVoid)&&this.kanCount<4){
@@ -229,6 +266,7 @@ export class RegionalSession implements GameSessionAPI {
   }
   private remove(player:Player,tiles:string[]){for(const tile of tiles){const index=player.hand.indexOf(tile);if(index<0)throw new Error('副露牌不在手中');player.hand.splice(index,1);}}
   private execute(player:Player,choice:Choice){
+    if(player.id===0)this.selfWinNotice=undefined;
     if(choice.type==='tsumo'){this.award([{id:player.id,score:this.winning(player,player.drawn!,true,false,true)!}],undefined,player.drawn!,true);return;}
     if(choice.type==='kita'){
       this.remove(player,['z4']);player.kita++;this.callsMade=true;this.players.forEach(p=>p.ippatsu=false);this.log(`${NAMES[player.id]}拔北`,player.id,'z4');this.draw(true,false);return;
@@ -349,14 +387,14 @@ export class RegionalSession implements GameSessionAPI {
     const repeat=this.profile.id!=='mcr'&&(dealerWon||(draw&&(this.profile.id==='sanma'?dealerReady:['taiwan','hangzhou','hongkong'].includes(this.profile.id))));
     if(repeat)this.honba++;else{this.dealer=(this.dealer+1)%this.profile.players;this.roundNumber++;this.honba=draw?this.honba+1:0;}
     const maxRounds=this.options.matchLength==='single'?0:this.options.matchLength==='east'?this.profile.players:this.profile.players*2;
-    const end=this.options.matchLength==='single'||this.roundNumber>=maxRounds||this.players.some(p=>p.points<0);
+    const end=this.options.matchLength!=='endless'&&(this.options.matchLength==='single'||this.roundNumber>=maxRounds||this.players.some(p=>p.points<0));
     if(end){
       const order=[...this.players].sort((a,b)=>b.points-a.points||a.id-b.id);if(this.sticks){order[0].points+=this.sticks*1000;this.sticks=0;}
       this.stage='match';this.actions=[];this.result={kind:'match',title:'对局结束',description:`${NAMES[order[0].id]}获得第一名`,winners:[],deltas:Array(this.profile.players).fill(0),scores:this.players.map(p=>p.points),ranks:this.players.map(p=>order.findIndex(x=>x.id===p.id)+1)};
     }else this.deal();
   }
   private observation(player:Player):BotObservation{
-    return {ownId:player.id,seat:this.seat(player.id),roundWind:Math.floor(this.roundNumber/this.profile.players)%4,roundHand:this.roundNumber%this.profile.players+1,finalRound:this.roundNumber>=(this.options.matchLength==='hanchan'?2:1)*this.profile.players-1,playerCount:this.profile.players,ownHand:coreString(player.hand,player.melds,player.drawn||undefined),doraIndicators:this.profile.id==='sanma'?this.dora:[],additionalPublicTiles:[...this.players.flatMap(p=>Array(p.kita).fill('z4')),...(this.profile.id==='sanma'?[]:this.dora)],tilesLeft:this.wall.length,honba:this.honba,riichiSticks:this.sticks,players:this.players.map(p=>({id:p.id,seat:this.seat(p.id),points:p.points,dealer:p.id===this.dealer,riichi:p.riichi,melds:p.melds.map(coreMeld),discards:p.discards.map(d=>({...d}))})),allowOpenTanyao:true,seed:`public:${player.hand.join('')}:${this.players.map(p=>p.discards.map(d=>d.tile).join('')).join('/')}:${this.wall.length}`,discardFuriten:this.profile.id==='sanma',tileLimits:countsOf(profileTiles(this.profile)),wildcards:this.wildcard?[this.wildcard]:[],pointScale:this.profile.id==='sanma'?1:.001,expectedDealInValue:this.profile.id==='sanma'?5200:8,dealerValueMultiplier:this.profile.id==='sanma'?1.5:1};
+    return {ownId:player.id,seat:this.seat(player.id),roundWind:Math.floor(this.roundNumber/this.profile.players)%4,roundHand:this.roundNumber%this.profile.players+1,finalRound:this.options.matchLength!=='endless'&&this.roundNumber>=(this.options.matchLength==='hanchan'?2:1)*this.profile.players-1,playerCount:this.profile.players,ownHand:coreString(player.hand,player.melds,player.drawn||undefined),doraIndicators:this.profile.id==='sanma'?this.dora:[],additionalPublicTiles:[...this.players.flatMap(p=>Array(p.kita).fill('z4')),...(this.profile.id==='sanma'?[]:this.dora)],tilesLeft:this.wall.length,honba:this.honba,riichiSticks:this.sticks,players:this.players.map(p=>({id:p.id,seat:this.seat(p.id),points:p.points,dealer:p.id===this.dealer,riichi:p.riichi,melds:p.melds.map(coreMeld),discards:p.discards.map(d=>({...d}))})),allowOpenTanyao:true,seed:`public:${player.hand.join('')}:${this.players.map(p=>p.discards.map(d=>d.tile).join('')).join('/')}:${this.wall.length}`,discardFuriten:this.profile.id==='sanma',tileLimits:countsOf(profileTiles(this.profile)),wildcards:this.wildcard?[this.wildcard]:[],pointScale:this.profile.id==='sanma'?1:.001,expectedDealInValue:this.profile.id==='sanma'?5200:8,dealerValueMultiplier:this.profile.id==='sanma'?1.5:1};
   }
   private botChoice(player:Player,choices:Choice[]):Choice{
     const difficulty=player.id===0?this.options.autoPlayDifficulty:this.options.difficulty;
@@ -378,7 +416,10 @@ export class RegionalSession implements GameSessionAPI {
     const evaluate=(index:number)=>{
       let metric=evaluations.get(index);if(metric)return metric;
       const after=player.hand.filter((_,i)=>i!==index),distance=this.distance(after,player.melds);
-      let ukeire=0;for(const tile of this.tileUniverse())if(this.distance([...after,tile],player.melds)<distance)ukeire+=Math.max(0,4-visible[tileIndex(tile)]);
+      let ukeire=0;for(const tile of this.tileUniverse()){
+        const remaining=Math.max(0,4-visible[tileIndex(tile)]);
+        if(remaining>0&&this.distance([...after,tile],player.melds)<distance)ukeire+=remaining;
+      }
       const shape=after.reduce((sum,t)=>sum+(after.some(q=>q!==t&&q[0]===t[0]&&Math.abs(Number(q[1])-Number(t[1]))<=2)?2:0)+(after.filter(q=>norm(q)===norm(t)).length>1?3:0),0);
       metric={distance,ukeire,shape,after};evaluations.set(index,metric);return metric;
     };
@@ -464,17 +505,19 @@ export class RegionalSession implements GameSessionAPI {
     const humanActions=this.stage==='discard'&&this.turn!==0?[]:this.actions;
     const human=this.players[0],distance=this.distance(human.hand,human.melds);
     this.snapshot={status:this.stage==='match'?'matchEnd':this.stage==='settlement'?'roundEnd':'playing',phase:this.stage==='exchange'?'exchange':this.stage==='void'?'void':this.stage==='settlement'||this.stage==='match'?'settlement':this.stage==='discard'&&this.turn===0?'discard':this.stage==='response'&&humanActions.length?'response':'waiting',seed:this.options.seed,players:this.players.map(player=>({id:player.id,name:NAMES[player.id],wind:WINDS[this.seat(player.id)],points:player.points,dealer:player.id===this.dealer,riichi:player.riichi,isHuman:player.id===0,hand:player.id===0?player.hand.map((tile,index)=>({id:this.handId(player.id,index),tile,label:tileLabel(tile),drawn:!!player.drawn&&index===player.hand.length-1})):[],concealedCount:player.hand.length,discards:player.discards.map(d=>({...d})),melds:player.melds.map(m=>({...m,tiles:[...m.tiles]})),flowers:[...player.flowers],kita:player.kita,voidSuit:player.voidSuit,hasWon:player.hasWon,winCount:player.winCount,...(this.stage==='settlement'&&this.roundWinners.some(w=>w.playerId===player.id)?{revealedHand:[...this.roundWinners.filter(win=>win.playerId===player.id).at(-1)!.hand]}:{})})),round:{wind:WINDS[Math.floor(this.roundNumber/this.profile.players)%4],hand:this.roundNumber%this.profile.players+1,honba:this.honba,riichiSticks:this.sticks,tilesLeft:this.wall.length,doraIndicators:[...this.dora],uraIndicators:this.stage==='settlement'&&this.roundWinners.some(w=>this.players[w.playerId].riichi)?[...this.ura]:[],dealer:this.dealer,wildcard:this.wildcard},turn:this.turn,humanId:0,actions:humanActions.map(({key:_key,index:_index,consume:_consume,kind:_kind,meldIndex:_meldIndex,...action})=>action),message:this.stage==='exchange'?'选择三张同花色的牌交换':this.stage==='void'?'请选择本局定缺花色':this.stage==='settlement'?this.result?.title||'本局结束':this.stage==='match'?'对局结束':this.stage==='discard'&&this.turn===0?'轮到你了 · 选择一张牌打出':this.stage==='response'&&humanActions.length?'请选择和牌、鸣牌或跳过':`${NAMES[this.turn]}正在思考…`,log:[...this.logs],result:this.result?structuredClone(this.result):null,...(this.latestWin?{latestWin:structuredClone(this.latestWin)}:{}),autoPlay:this.options.autoPlay,speed:this.options.speed,revision:++this.revision,shanten:distance,waits:distance===0?this.shapeWaits(human):[],mode:this.profile.id,modeName:getMode(this.profile.id).name,difficulty:this.options.difficulty,playerCount:this.profile.players,handSize:this.profile.sets*3+1,scoreUnit:this.profile.id==='sanma'?'点':'分',setupSelection:[...this.exchangeSelection].map(i=>this.handId(0,i)),ruleSummary:[...this.profile.summary]};
+    if(this.options.matchLength==='endless')this.snapshot.round.sequence=this.handSequence;
     if(this.profile.id==='sanma')this.snapshot.riichiAssist=this.calculateAssist(projectRiichiAssist(this.snapshot),{temporary:human.temporaryFuriten,riichiPass:human.permanentFuriten});
     this.snapshot.quickControls={...this.quickControls};
     this.snapshot.autoPlayDifficulty=this.options.autoPlayDifficulty;
     this.snapshot.autoExchangeThree=this.options.autoExchangeThree;
     if(this.ronNotice)this.snapshot.ronNotice=structuredClone(this.ronNotice);
+    if(this.selfWinNotice&&this.stage==='discard'&&this.turn===0)this.snapshot.selfWinNotice=structuredClone(this.selfWinNotice);
     if(this.stage==='exchange'&&this.options.autoPlay&&!this.options.autoExchangeThree)this.snapshot.message='选择三张同花色的牌，确认换三张后继续托管';
     if(this.replayFrames)appendReplayFrame(this.replayFrames,this.snapshot,Object.fromEntries(this.players.map(player=>[player.id,[...player.hand]])));
     if(this.replaying)return;
     for(const listener of this.listeners)listener();
   }
-  getSavedGame():SavedGame{return {version:1,seed:this.options.seed,matchLength:this.options.matchLength,mode:this.profile.id,difficulty:this.options.difficulty,startPoints:this.options.startPoints,autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:this.options.autoExchangeThree,aiVersion:this.aiVersion,replayPosition:this.step,variantOptions:this.options.variantOptions,decisions:this.decisions.map(d=>({...d}))};}
+  getSavedGame():SavedGame{return {version:1,seed:this.options.seed,matchLength:this.options.matchLength,mode:this.profile.id,difficulty:this.options.difficulty,startPoints:this.options.startPoints,autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:this.options.autoExchangeThree,aiVersion:this.aiVersion,replayPosition:this.step,variantOptions:this.options.variantOptions,decisions:this.decisions.map(d=>({...d})),...(this.checkpoint?{checkpoint:structuredClone(this.checkpoint)}:{})};}
   exportReplay():ReplayData{return {...this.getSavedGame(),rules:{mode:this.profile.id,version:getMode(this.profile.id).ruleVersion,summary:this.profile.summary},log:this.logs.map(l=>({...l}))};}
   loadSavedGame(data:SavedGame):boolean{
     if(!data||data.version!==1||data.mode!==this.profile.id||typeof data.seed!=='string'||!Array.isArray(data.decisions)||data.decisions.length>20000||!data.decisions.every(d=>typeof d?.key==='string')||data.difficulty&&!validDifficulty(data.difficulty))return false;
@@ -482,7 +525,7 @@ export class RegionalSession implements GameSessionAPI {
     const previous=this.getSavedGame();
     const restore=(save:SavedGame)=>{
       this.aiVersion=save.aiVersion??2;
-      this.replaying=true;this.newGame({seed:save.seed,mode:save.mode,difficulty:save.difficulty||'standard',startPoints:restoredStartPoints(save),autoPlayDifficulty:save.autoPlayDifficulty??'expert',autoExchangeThree:save.autoExchangeThree??false,variantOptions:save.variantOptions,matchLength:save.matchLength,autoPlay:false,quickControls:DEFAULT_QUICK_CONTROLS});let cursor=0;
+      this.replaying=true;this.initialize({seed:save.seed,mode:save.mode,difficulty:save.difficulty||'standard',startPoints:restoredStartPoints(save),autoPlayDifficulty:save.autoPlayDifficulty??'expert',autoExchangeThree:save.autoExchangeThree??false,variantOptions:save.variantOptions,matchLength:save.matchLength,autoPlay:false,quickControls:DEFAULT_QUICK_CONTROLS},save.checkpoint);let cursor=0;
       for(let guard=0;guard<100000;guard++){
         if(save.replayPosition!=null&&this.step>=save.replayPosition&&cursor===save.decisions.length)break;
         if(save.replayPosition!=null&&this.step>save.replayPosition)return false;
@@ -501,7 +544,7 @@ export class RegionalSession implements GameSessionAPI {
   /** Used only on a disposable session; never emits reconstructed live events. */
   async captureReplayFrames(data:SavedGame):Promise<ReplayFrame[]>{
     validateReplayData(data);this.cancel();this.replaying=true;this.replayFrames=[];this.aiVersion=data.aiVersion??2;
-    this.newGame({seed:data.seed,mode:data.mode,difficulty:data.difficulty||'standard',startPoints:restoredStartPoints(data),autoPlayDifficulty:data.autoPlayDifficulty??'expert',autoExchangeThree:data.autoExchangeThree??false,variantOptions:data.variantOptions,matchLength:data.matchLength,autoPlay:false,speed:0,quickControls:DEFAULT_QUICK_CONTROLS});
+    this.initialize({seed:data.seed,mode:data.mode,difficulty:data.difficulty||'standard',startPoints:restoredStartPoints(data),autoPlayDifficulty:data.autoPlayDifficulty??'expert',autoExchangeThree:data.autoExchangeThree??false,variantOptions:data.variantOptions,matchLength:data.matchLength,autoPlay:false,speed:0,quickControls:DEFAULT_QUICK_CONTROLS},data.checkpoint);
     let cursor=0;
     for(let guard=0;guard<MAX_REPLAY_STEPS;guard++){
       const exactEnd=data.replayPosition!=null;

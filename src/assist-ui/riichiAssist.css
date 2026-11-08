@@ -18,6 +18,7 @@
 .assist-status>strong{font-size:13px;font-weight:600;color:var(--cream)}
 .assist-status.has-yaku>strong{color:var(--gold)}
 .assist-status>span{font-size:12px;color:#eab2a5}
+.assist-status>.regional-rule{font-size:13px;color:var(--cream)}
 .table-tools .assist-quick{color:var(--muted);font-size:11px;gap:5px;padding:0 5px}
 .table-tools .assist-quick.is-on{color:var(--gold)}
 .assist-quick i{display:block;width:5px;height:5px;border-radius:50%;background:currentColor}

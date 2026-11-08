@@ -15,7 +15,7 @@ export interface TableMotionCue {
 }
 
 /** Display identity only: never used to make a decision or inspect a wall. */
-export const tableScope = (snapshot: GameSnapshot) => `${snapshot.mode}:${snapshot.seed}:${snapshot.round.wind}:${snapshot.round.hand}:${snapshot.round.dealer}`;
+export const tableScope = (snapshot: GameSnapshot) => `${snapshot.mode}:${snapshot.seed}:${snapshot.round.wind}:${snapshot.round.hand}:${snapshot.round.dealer}:${snapshot.round.sequence ?? ''}`;
 
 export function needsTableBaseline(before: GameSnapshot | null, current: GameSnapshot): boolean {
   return !before || tableScope(before) !== tableScope(current)

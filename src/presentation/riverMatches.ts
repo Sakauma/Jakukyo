@@ -1,5 +1,6 @@
 import type { GameSnapshot, PlayerView } from '../game/types';
 import { riverLayout } from '../table/riverLayout';
+import { seatLayout } from '../table/tableLayout';
 
 /** Matching is by tile kind; a red five is still the same five for river comparison. */
 export function normalizeRiverTile(code: string | null | undefined): string | null {
@@ -11,7 +12,7 @@ export function normalizeRiverTile(code: string | null | undefined): string | nu
 export function riverSelectionScope(snapshot: GameSnapshot): string {
   const human = snapshot.players.find(player => player.isHuman);
   return JSON.stringify([snapshot.mode ?? 'riichi', snapshot.seed, snapshot.round.wind, snapshot.round.hand,
-    snapshot.round.honba, snapshot.round.dealer, human?.hand.map(tile => [tile.id, tile.tile, tile.drawn]) ?? []]);
+    snapshot.round.honba, snapshot.round.dealer, snapshot.round.sequence, human?.hand.map(tile => [tile.id, tile.tile, tile.drawn]) ?? []]);
 }
 
 export function resolveRiverSelection(snapshot: GameSnapshot | null, selectedId: string | null, selectedScope: string | null): string | null {
@@ -26,28 +27,34 @@ export interface PlayerRiverMatches {
   inRiverCount: number;
   /** Only the tiles on this player's current 3D river page. */
   pageCount: number;
+  /** Face-up matching meld tiles; concealed backs are excluded. */
+  inMeldCount: number;
   /** Historical discard entries, including tiles that were later called away. */
   discardedCount: number;
   calledAwayCount: number;
   inRiverIndices: number[];
   pageIndices: number[];
   discardedIndices: number[];
+  meldIndices: Array<{ meldIndex: number; tileIndex: number }>;
 }
 
-/** Public rivers only: never estimates the wall, opponents' hands, or furiten. */
-export function getRiverMatches(players: readonly Pick<PlayerView, 'id' | 'discards'>[], highlightedTile: string | null | undefined) {
+/** Public rivers and face-up meld tiles only; never inspect concealed hands. */
+export function getRiverMatches(players: readonly (Pick<PlayerView, 'id' | 'discards'> & Partial<Pick<PlayerView, 'melds'>>)[], highlightedTile: string | null | undefined) {
   const tile = normalizeRiverTile(highlightedTile);
   const byPlayer: PlayerRiverMatches[] = players.map(player => {
     const discardedIndices = tile ? player.discards.flatMap((discard, index) => normalizeRiverTile(discard.tile) === tile ? [index] : []) : [];
     const inRiverIndices = discardedIndices.filter(index => !player.discards[index].called);
     const currentPage = new Set(riverLayout(player.discards).items.map(discard => discard.sourceIndex));
     const pageIndices = inRiverIndices.filter(index => currentPage.has(index));
-    return { playerId: player.id, inRiverCount: inRiverIndices.length, pageCount: pageIndices.length,
+    const meldIndices = tile ? seatLayout([], player.melds ?? [], false).melds.flatMap(item =>
+      item.tile && normalizeRiverTile(item.tile) === tile ? [{ meldIndex: item.meldIndex, tileIndex: item.tileIndex }] : []) : [];
+    return { playerId: player.id, inRiverCount: inRiverIndices.length, pageCount: pageIndices.length, inMeldCount: meldIndices.length,
       discardedCount: discardedIndices.length, calledAwayCount: discardedIndices.length - inRiverIndices.length,
-      inRiverIndices, pageIndices, discardedIndices };
+      inRiverIndices, pageIndices, discardedIndices, meldIndices };
   });
   return { tile, byPlayer, inRiverCount: byPlayer.reduce((total, player) => total + player.inRiverCount, 0),
     pageCount: byPlayer.reduce((total, player) => total + player.pageCount, 0),
+    inMeldCount: byPlayer.reduce((total, player) => total + player.inMeldCount, 0),
     discardedCount: byPlayer.reduce((total, player) => total + player.discardedCount, 0),
     calledAwayCount: byPlayer.reduce((total, player) => total + player.calledAwayCount, 0) };
 }

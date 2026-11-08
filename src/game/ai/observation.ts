@@ -13,7 +13,7 @@ interface PublicBoardSource {
 }
 
 /** No opponent hand contents, engine references, actual wall, or deal seed are copied into AI input. */
-export function createBotObservation(ownId: number, seat: number, ownHand: string, board: PublicBoardSource, matchLength: 'single' | 'east' | 'hanchan'): BotObservation {
+export function createBotObservation(ownId: number, seat: number, ownHand: string, board: PublicBoardSource, matchLength: 'single' | 'east' | 'hanchan' | 'endless'): BotObservation {
   const players = board.player_id.map((id, playerSeat) => ({
     id, seat: playerSeat, points: board.defen[id], dealer: playerSeat === 0,
     riichi: Boolean(board.shoupai[playerSeat].lizhi),
@@ -23,8 +23,8 @@ export function createBotObservation(ownId: number, seat: number, ownHand: strin
   const observation: BotObservation = {
     ownId, seat, ownHand, players, playerCount: board.player_id.length,
     roundWind: board.zhuangfeng, roundHand: board.jushu + 1,
-    finalRound: matchLength === 'single' || board.zhuangfeng > (matchLength === 'east' ? 0 : 1)
-      || board.zhuangfeng === (matchLength === 'east' ? 0 : 1) && board.jushu >= 3,
+    finalRound: matchLength !== 'endless' && (matchLength === 'single' || board.zhuangfeng > (matchLength === 'east' ? 0 : 1)
+      || board.zhuangfeng === (matchLength === 'east' ? 0 : 1) && board.jushu >= 3),
     doraIndicators: [...board.shan.baopai], tilesLeft: board.shan.paishu,
     honba: board.changbang, riichiSticks: board.lizhibang,
     allowOpenTanyao: true, discardFuriten: true, tileLimits: Array<number>(34).fill(4),

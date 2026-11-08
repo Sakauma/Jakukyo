@@ -13,7 +13,7 @@ export interface RetainedRonFeedback {
 }
 
 function roundKey(snapshot: NoticeSnapshot) {
-  return JSON.stringify([snapshot.mode, snapshot.seed, snapshot.round.wind, snapshot.round.hand, snapshot.round.honba, snapshot.round.dealer]);
+  return JSON.stringify([snapshot.mode, snapshot.seed, snapshot.round.wind, snapshot.round.hand, snapshot.round.honba, snapshot.round.dealer, snapshot.round.sequence]);
 }
 
 function canWin(snapshot: NoticeSnapshot) {

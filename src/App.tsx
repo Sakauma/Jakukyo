@@ -20,6 +20,7 @@ import { createTableAudio, DEFAULT_AUDIO_PREFERENCES } from './audio';
 import { WinFeedback } from './effects/WinFeedback';
 import { RoundSettlement } from './settlement/RoundSettlement';
 import { RiichiAssistPanel } from './assist-ui/RiichiAssistPanel';
+import { RegionalAssistPanel } from './assist-ui/RegionalAssistPanel';
 import { ResponseFeedback, useRonFeedback } from './assist-ui/ResponseFeedback';
 import { DiscardFeedback } from './assist-ui/DiscardFeedback';
 import { getRiverMatches, resolveRiverSelection, riverSelectionScope } from './presentation/riverMatches';
@@ -145,9 +146,11 @@ export default function App() {
   const seenWins = useRef(new Set<string>());
   const [seed, setSeed] = useState('');
   const [notice, setNotice] = useState('');
+  const [unsavedNext, setUnsavedNext] = useState<LegalAction | null>(null);
   const [webglFailed, setWebglFailed] = useState(false);
   const sessionRef = useRef<GameSessionAPI | null>(null);
   const recordIdRef = useRef<string | null>(null);
+  const recordTransitionRef = useRef(false);
   const audioRef = useRef<ReturnType<typeof createTableAudio> | null>(null);
   const logEnd = useRef<HTMLDivElement>(null);
   const theme = getTheme(themeId);
@@ -188,11 +191,11 @@ export default function App() {
   useEffect(() => { session?.setSpeed(speed); }, [speed, session]);
   useEffect(() => {
     if (!session || !snapshot) return;
-    const timeout = setTimeout(() => { try { const data = session.getSavedGame(); localStorage.setItem(SAVE_KEY, JSON.stringify(data)); setSaved(data); } catch { setNotice('本地存档不可用，当前对局仍可继续。'); } }, 100);
+    const timeout = setTimeout(() => { if (sessionRef.current !== session || session.getSnapshot() !== snapshot) return; try { const data = session.getSavedGame(); localStorage.setItem(SAVE_KEY, JSON.stringify(data)); setSaved(data); } catch { setNotice('本地存档不可用，当前对局仍可继续。'); } }, 100);
     return () => clearTimeout(timeout);
   }, [snapshot?.revision, session]);
   useEffect(() => {
-    if (!session || !snapshot || !recordIdRef.current) return;
+    if (!session || !snapshot || !recordIdRef.current || recordTransitionRef.current || sessionRef.current !== session || session.getSnapshot() !== snapshot) return;
     try { observeRecord(recordIdRef.current, session.getSavedGame(), snapshot); }
     catch { setNotice('本地牌谱暂时无法保存，当前对局仍可继续。'); }
   }, [snapshot?.revision, session]);
@@ -235,7 +238,8 @@ export default function App() {
       const startingAutoExchangeThree = resume && saved && typeof saved.autoExchangeThree === 'boolean' ? saved.autoExchangeThree : autoExchangeThree;
       const startingExchangeThree = resume && saved && startingMode.startsWith('sichuan') ? saved.variantOptions?.exchangeThree === true : exchangeThree;
       if (getMode(startingMode).status !== 'playable') { setNotice('这套规则仍在制作中，请先选择已开放的玩法。'); return; }
-      const options: SessionOptions = { mode: startingMode, difficulty: resume && saved ? saved.difficulty ?? 'standard' : difficulty, seed: seed.trim() || undefined, speed, matchLength: japanese(startingMode) ? matchLength : 'east', variantOptions: { exchangeThree: startingExchangeThree }, quickControls: quickPreferences, autoPlayDifficulty: startingAutoPlayDifficulty, autoExchangeThree: startingAutoExchangeThree };
+      const startingLength = resume && saved ? saved.matchLength : (japanese(startingMode) || matchLength === 'endless' ? matchLength : 'east');
+      const options: SessionOptions = { mode: startingMode, difficulty: resume && saved ? saved.difficulty ?? 'standard' : difficulty, seed: seed.trim() || undefined, speed, matchLength: startingLength, variantOptions: { exchangeThree: startingExchangeThree }, quickControls: quickPreferences, autoPlayDifficulty: startingAutoPlayDifficulty, autoExchangeThree: startingAutoExchangeThree };
       const next = createGameSession(options);
       if (resume && saved && !next.loadSavedGame(saved)) { next.dispose(); setNotice('此存档与当前规则或 AI 版本不兼容，请重新开局。'); return; }
       next.setQuickControls(quickPreferences);
@@ -244,7 +248,7 @@ export default function App() {
       flushRecords(); sessionRef.current?.dispose(); handOrder.reset(); sessionRef.current = next; setSession(next); setModeId(startingMode);
       try { recordIdRef.current = beginRecord(next.getSavedGame(), { resume }); observeRecord(recordIdRef.current, next.getSavedGame(), next.getSnapshot()); }
       catch { recordIdRef.current = null; setNotice('本地牌谱暂时无法保存，当前对局仍可继续。'); }
-      setSelectedId(null); setRiichiMode(false); setDiscardIntent(null); setCelebration(null); setFeedbackEvent(null); setShowRivers(false); setPanel(null);
+      setSelectedId(null); setRiichiMode(false); setDiscardIntent(null); setCelebration(null); setFeedbackEvent(null); setShowRivers(false); setPanel(null); setUnsavedNext(null);
       setExperiencePanel(null);
       const audio = audioRef.current; if (audio) void audio.unlock().then(ok => { if (ok && !resume) audio.play('deal'); });
     } catch (error) { setNotice(error instanceof Error ? error.message : '对局暂时无法启动。'); }
@@ -254,17 +258,43 @@ export default function App() {
     if (session && recordIdRef.current) { try { observeRecord(recordIdRef.current, session.getSavedGame(), session.getSnapshot()); } catch { /* The record store reports persistent failures separately. */ } }
     flushRecords(); recordIdRef.current = null;
     if (session) { try { const data = session.getSavedGame(); localStorage.setItem(SAVE_KEY, JSON.stringify(data)); setSaved(data); } catch { /* See save notice. */ } session.dispose(); }
-    handOrder.reset(); sessionRef.current = null; setSession(null); setPanel(null); setSelectedId(null); setRiichiMode(false); setDiscardIntent(null); setCelebration(null); setFeedbackEvent(null); setShowRivers(false);
+    handOrder.reset(); sessionRef.current = null; setSession(null); setPanel(null); setSelectedId(null); setRiichiMode(false); setDiscardIntent(null); setCelebration(null); setFeedbackEvent(null); setShowRivers(false); setUnsavedNext(null);
     setExperiencePanel(null);
   }
-  function dispatch(action: LegalAction): boolean {
+  function dispatch(action: LegalAction, continueWithoutSaving = false): boolean {
     const active = sessionRef.current;
     if (!active || active !== session) return false;
     const current = active.getSnapshot();
     const legal = current.actions.find(candidate => candidate.id === action.id && candidate.type === action.type && candidate.tileId === action.tileId);
     if (!legal) return false;
     const selectionScope = riverSelectionScope(current);
-    if (!active.dispatch(legal.id)) return false;
+    const previousSave = legal.type === 'next' ? active.getSavedGame() : null;
+    const advancingEndless = previousSave?.matchLength === 'endless';
+    if (advancingEndless) {
+      let recorded = !!recordIdRef.current;
+      try { if (recordIdRef.current) observeRecord(recordIdRef.current, previousSave, current); }
+      catch { recorded = false; }
+      const recordsSaved = flushRecords();
+      let gameSaved = true;
+      try { localStorage.setItem(SAVE_KEY, JSON.stringify(previousSave)); setSaved(previousSave); }
+      catch { gameSaved = false; }
+      if ((!recorded || !recordsSaved || !gameSaved) && !continueWithoutSaving) {
+        setUnsavedNext(legal);
+        return false;
+      }
+    }
+    recordTransitionRef.current = advancingEndless;
+    try {
+      if (!active.dispatch(legal.id)) return false;
+      if (advancingEndless) {
+        const nextSave = active.getSavedGame();
+        try { recordIdRef.current = beginRecord(nextSave, { resume: true }); observeRecord(recordIdRef.current, nextSave, active.getSnapshot()); }
+        catch { recordIdRef.current = null; setNotice('本地牌谱暂时无法保存，当前对局仍可继续。'); }
+        try { localStorage.setItem(SAVE_KEY, JSON.stringify(nextSave)); setSaved(nextSave); }
+        catch { setNotice('本地存档不可用，当前对局仍可继续。'); }
+        setUnsavedNext(null);
+      }
+    } finally { recordTransitionRef.current = false; }
     if ((legal.type === 'discard' || legal.type === 'riichi') && legal.tileId) {
       handOrder.forget(legal.tileId);
       setDiscardIntent({ sequence: ++discardSequence.current, tileId: legal.tileId, selectionScope });
@@ -281,7 +311,7 @@ export default function App() {
   }
 
   const human = snapshot?.players.find(player => player.isHuman);
-  const handScope = snapshot ? `${snapshot.mode}:${snapshot.seed}:${snapshot.round.wind}:${snapshot.round.hand}:${snapshot.round.honba}:${snapshot.round.dealer}` : 'lobby';
+  const handScope = snapshot ? `${snapshot.mode}:${snapshot.seed}:${snapshot.round.wind}:${snapshot.round.hand}:${snapshot.round.honba}:${snapshot.round.dealer}:${snapshot.round.sequence ?? ''}` : 'lobby';
   const displayHand = snapshot ? handOrder.reconcile(human?.hand ?? [], handScope, autoSort) : undefined;
   const exchanging = snapshot?.phase === 'exchange';
   const selectedTile = displayHand?.find(tile => tile.id === selectedId);
@@ -318,7 +348,7 @@ export default function App() {
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if (showRivers) { if (event.key === 'Escape') setShowRivers(false); return; }
-      if (panel || experiencePanel || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+      if (panel || experiencePanel || unsavedNext || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
       if (event.key === 'Escape') { setSelectedId(null); setRiichiMode(false); return; }
       if (!ownTurn && !exchanging) return;
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
@@ -329,7 +359,7 @@ export default function App() {
       if (event.key === 'Enter' && selectedAction && !(event.target instanceof HTMLButtonElement)) { event.preventDefault(); dispatch(selectedAction); }
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
-  }, [snapshot?.revision, selectedId, riichiMode, panel, experiencePanel, showRivers, autoSort, displayHand]);
+  }, [snapshot?.revision, selectedId, riichiMode, panel, experiencePanel, unsavedNext, showRivers, autoSort, displayHand]);
 
   return <div className={`app theme-${themeId} ${session ? 'is-playing' : 'is-lobby'}`} style={themeVars} onPointerDownCapture={() => { void audioRef.current?.unlock(); }} onKeyDownCapture={() => { void audioRef.current?.unlock(); }}>
     <header className="topbar">
@@ -342,14 +372,14 @@ export default function App() {
       <div className="table-area" aria-label="3D 麻将牌桌">
         <SceneBoundary><MahjongTable snapshot={snapshot} displayHand={displayHand} selectedId={selectedId} highlightedTile={highlightedTile} selectedIds={snapshot?.setupSelection} interactiveIds={selectable.map(tile => tile.id)} onSelect={selectTile} onTileDiscard={discardTile} discardAction={discardAction} discardIntent={discardIntent} view={view} theme={theme} celebration={reducedMotion ? null : celebration} reducedMotion={reducedMotion} previewPlayerCount={selectedMode.players} onFailure={() => setWebglFailed(true)} onRestore={() => setWebglFailed(false)} /></SceneBoundary>
         <div className="table-vignette" />
-        <div className="table-tools">{snapshot && <>{exchangeThreeEnabled && <label className="exchange-policy-quick"><span>换牌</span><ExchangePolicySelect ariaLabel="换三张托管方式" value={activeAutoExchangeThree} onChange={changeAutoExchangeThree} /></label>}{isJapanese && <button className={`sort-hand-button assist-quick ${riichiHints ? 'is-on' : ''}`} role="switch" aria-checked={riichiHints} aria-label="听牌辅助" title="显示听张、未见数与向听" onClick={() => setRiichiHints(!riichiHints)}><i />听牌辅助</button>}<button className={`sort-hand-button auto-sort-quick ${autoSort ? 'is-on' : ''}`} role="switch" aria-checked={autoSort} aria-label="自动理牌" onClick={() => setAutoSort(!autoSort)}><i />自动理牌</button><button className="sort-hand-button" onClick={sortHand} disabled={!displayHand?.length} title="按万、筒、条、字牌整理，摸入牌保持最右"><Icon name="sort" size={16} />理牌</button><button className="icon-button" aria-label="牌河全览" title="查看完整牌河" onClick={() => setShowRivers(true)}><Icon name="river" /></button></>}<button className={`icon-button ${view === 'overhead' ? 'active' : ''}`} aria-label={view === 'overhead' ? '切换透视视角' : '切换俯视视角'} title="切换视角" onClick={() => setView(view === 'perspective' ? 'overhead' : 'perspective')}><Icon name="view" /></button><button className="icon-button" aria-label={sound ? '关闭全部声音' : '打开全部声音'} onClick={() => setSound(!sound)}><Icon name={sound ? 'sound' : 'mute'} /></button>{snapshot && <button className="icon-button" aria-label="查看对局记录" onClick={() => setPanel(panel === 'log' ? null : 'log')}><Icon name="log" /></button>}</div>
+        <div className="table-tools">{snapshot && <>{exchangeThreeEnabled && <label className="exchange-policy-quick"><span>换牌</span><ExchangePolicySelect ariaLabel="换三张托管方式" value={activeAutoExchangeThree} onChange={changeAutoExchangeThree} /></label>}<button className={`sort-hand-button assist-quick ${riichiHints ? 'is-on' : ''}`} role="switch" aria-checked={riichiHints} aria-label="听牌辅助" title="显示听张与向听" onClick={() => setRiichiHints(!riichiHints)}><i />听牌辅助</button><button className={`sort-hand-button auto-sort-quick ${autoSort ? 'is-on' : ''}`} role="switch" aria-checked={autoSort} aria-label="自动理牌" onClick={() => setAutoSort(!autoSort)}><i />自动理牌</button><button className="sort-hand-button" onClick={sortHand} disabled={!displayHand?.length} title="按万、筒、条、字牌整理，摸入牌保持最右"><Icon name="sort" size={16} />理牌</button><button className="icon-button" aria-label="牌河全览" title="查看完整牌河" onClick={() => setShowRivers(true)}><Icon name="river" /></button></>}<button className={`icon-button ${view === 'overhead' ? 'active' : ''}`} aria-label={view === 'overhead' ? '切换透视视角' : '切换俯视视角'} title="切换视角" onClick={() => setView(view === 'perspective' ? 'overhead' : 'perspective')}><Icon name="view" /></button><button className="icon-button" aria-label={sound ? '关闭全部声音' : '打开全部声音'} onClick={() => setSound(!sound)}><Icon name={sound ? 'sound' : 'mute'} /></button>{snapshot && <button className="icon-button" aria-label="查看对局记录" onClick={() => setPanel(panel === 'log' ? null : 'log')}><Icon name="log" /></button>}</div>
         {snapshot && <>
           <div className="round-chip"><span>{snapshot.round.wind}{snapshot.round.hand}局</span>{isJapanese && <><i /><span>{snapshot.round.honba} 本场</span></>}<i /><span className="muted">余牌 <b>{snapshot.round.tilesLeft}</b></span></div>
           <div className="dora-chip">{snapshot.round.doraIndicators.length > 0 && <><span className="eyebrow">宝牌指示牌</span><div>{snapshot.round.doraIndicators.map((tile, i) => <span className={`mini-tile suit-${tile[0]}`} key={i} title={tileName(tile)}>{tileName(tile)}</span>)}</div></>}{snapshot.round.wildcard && <div className="wildcard-chip"><span>百搭</span><b className="mini-tile">{tileName(snapshot.round.wildcard)}</b></div>}</div>
           {snapshot.players.filter(player => !player.isHuman).map(player => <div key={player.id} className={`seat seat-${tableSeat(player.id, snapshot.players.length)} ${snapshot.turn === player.id && inRound ? 'seat-active' : ''} ${player.hasWon ? 'seat-won' : ''}`}>
             <div className="seat-avatar">{player.wind}</div><div className="seat-info"><div className="seat-name">{player.name}<span>{activeDifficulty.label}</span></div><div className="seat-points">{format(player.points)}<small>{unit}</small></div><button className={`river-page-note ${riverLayout(player.discards).pages > 1 ? 'is-paged' : ''}`} onClick={() => setShowRivers(true)} title="查看完整牌河">牌河 {riverLayout(player.discards).count} 张{riverLayout(player.discards).pages > 1 ? ` · 第${riverLayout(player.discards).page}页` : ''}</button><div className="seat-bonuses">{player.voidSuit && <span>缺{ suitLabel(player.voidSuit) }</span>}{!!player.kita && <span>拔北 ×{player.kita}</span>}{!!player.flowers?.length && <span>花 ×{player.flowers.length}</span>}{player.hasWon && <span>已和{player.winCount && player.winCount > 1 ? ` ×${player.winCount}` : ''}</span>}</div></div>{player.riichi ? <span className="riichi-badge">立直</span> : snapshot.turn === player.id && inRound ? <span className="thinking-dots"><i /><i /><i /></span> : null}
           </div>)}
-          <div className={`table-caption ${highlightedTile ? 'river-selection-count' : ''}`} role={highlightedTile ? 'status' : undefined}>{highlightedTile ? <><strong>{tileName(selectedTile?.tile ?? highlightedTile)}</strong><span>牌河同种 {riverMatches.inRiverCount} 张</span></> : <>{theme.name} · {activeMode.name}</>}</div>
+          <div className={`table-caption ${highlightedTile ? 'river-selection-count' : ''}`} role={highlightedTile ? 'status' : undefined}>{highlightedTile ? <><strong>{tileName(selectedTile?.tile ?? highlightedTile)}</strong><span>牌河 {riverMatches.inRiverCount} · 副露 {riverMatches.inMeldCount}</span></> : <>{theme.name} · {activeMode.name}</>}</div>
         </>}
         {!snapshot && <div className="lobby-overlay"><div className="lobby-card lobby-config">
           <h1>好牌，<em>慢慢打。</em></h1>
@@ -360,7 +390,7 @@ export default function App() {
           <div className="config-label"><span>电脑难度</span></div>
           <div className="difficulty-options" role="group" aria-label="电脑难度">{DIFFICULTIES.map((item, index) => <button key={item.id} aria-pressed={difficulty === item.id} className={difficulty === item.id ? 'selected' : ''} onClick={() => setDifficulty(item.id)}><span>{item.label}</span></button>)}</div>
           
-          <div className="lobby-options">{japanese(modeId) && <label>对局长度<select aria-label="对局长度" value={matchLength} onChange={event => setMatchLength(event.target.value as NonNullable<SessionOptions['matchLength']>)}><option value="single">单局练习</option><option value="east">东风战</option><option value="hanchan">东南半庄</option></select></label>}{modeId.startsWith('sichuan') && <label className="exchange-toggle"><input type="checkbox" checked={exchangeThree} onChange={event => setExchangeThree(event.target.checked)} />开启换三张</label>}<button className="text-button" onClick={() => setPanel('themes')}><span className="theme-dot" style={{ background: theme.felt }} />{theme.name}<Icon name="palette" size={15} /></button></div>
+          <div className="lobby-options"><label>对局长度<select aria-label="对局长度" value={japanese(modeId) ? matchLength : matchLength === 'endless' ? 'endless' : 'east'} onChange={event => setMatchLength(event.target.value as NonNullable<SessionOptions['matchLength']>)}>{japanese(modeId) ? <><option value="single">单局练习</option><option value="east">东风战</option><option value="hanchan">东南半庄</option></> : <option value="east">标准对局</option>}<option value="endless">无限模式</option></select></label>{modeId.startsWith('sichuan') && <label className="exchange-toggle"><input type="checkbox" checked={exchangeThree} onChange={event => setExchangeThree(event.target.checked)} />开启换三张</label>}<button className="text-button" onClick={() => setPanel('themes')}><span className="theme-dot" style={{ background: theme.felt }} />{theme.name}<Icon name="palette" size={15} /></button></div>
           {exchangeThreeEnabled && <label className="exchange-policy-lobby"><span>托管换牌</span><ExchangePolicySelect ariaLabel="开局换三张托管方式" value={activeAutoExchangeThree} onChange={changeAutoExchangeThree} /></label>}
           <button className="primary-button start-button" onClick={() => startGame()} disabled={webglFailed || selectedMode.status !== 'playable'}>开始 {selectedMode.name}<Icon name="arrow" size={20} /></button>
           {saved && <button className="resume-button" onClick={() => startGame(true)}>继续上次对局 <span>{getMode(saved.mode ?? 'riichi').name} · 自动存档</span></button>}
@@ -368,6 +398,7 @@ export default function App() {
         {webglFailed && <div className="webgl-notice">3D 图形连接已中断，请刷新页面恢复存档。</div>}
         <DiscardFeedback snapshot={snapshot} sessionKey={session} theme={theme} reducedMotion={reducedMotion} />
         {snapshot && <RiichiAssistPanel snapshot={snapshot} selectedTile={selectedTile} riichiMode={riichiMode} theme={theme} showDetails={riichiHints} />}
+        {snapshot && <RegionalAssistPanel snapshot={snapshot} session={session} selectedTile={selectedTile} notice={ronNotice} theme={theme} showDetails={riichiHints} />}
       </div>
 
       {snapshot ? <section className={`play-dock ${hasResponseFeedback ? 'has-response-feedback' : ''}`} aria-label="我的手牌与操作">
@@ -392,6 +423,7 @@ export default function App() {
     {experiencePanel === 'library' && <ReplayLibrary theme={theme} onClose={() => setExperiencePanel(null)} />}
     {experiencePanel === 'stats' && <ExperienceDialog title="本地战绩" onClose={() => setExperiencePanel(null)}><StatsPanel onLibrary={() => openExperience('library')} /></ExperienceDialog>}
     {experiencePanel === 'help' && <ExperienceDialog title="新手帮助" onClose={() => setExperiencePanel(null)}><HelpCenter key={helpLesson} initialLesson={helpLesson} mode={activeMode.id} theme={theme} onRules={() => { setExperiencePanel(null); setPanel('rules'); }} /></ExperienceDialog>}
+    {unsavedNext && <div className="storage-warning"><ExperienceDialog title="本地记录未能保存" onClose={() => setUnsavedNext(null)}><p>牌谱或存档未能写入本地。继续后仍可游戏，但关闭或刷新页面可能丢失未保存的记录。</p><div className="storage-warning-actions"><button className="action-button pass-button" type="button" onClick={() => setUnsavedNext(null)}>留在结算页</button><button className="primary-button" type="button" onClick={() => dispatch(unsavedNext, true)}>继续下一局</button></div></ExperienceDialog></div>}
     {feedbackEvent && snapshot && <WinFeedback key={feedbackEvent.id} event={feedbackEvent} snapshot={snapshot} reduced={reducedMotion || !winEffects} onDone={() => setFeedbackEvent(null)} />}
     {celebration && <WinCelebration effect={celebration} reduced={reducedMotion} dismiss={() => setCelebration(null)} />}
     {notice && <div className="toast" role="status">{notice}</div>}

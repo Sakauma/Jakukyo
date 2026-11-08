@@ -1,8 +1,9 @@
 import type { GameSnapshot, ModeId, SavedGame } from '../game/types';
 import { MODES, getMode } from '../game/catalog';
 import { restoredStartPoints, validStartPoints } from '../game/startingPoints';
+import { validEndlessCheckpoint } from '../game/endlessCheckpoint';
 import type { GameRecord, PlayedHistory, RecordedRound } from './types';
-import { mergeHistory, stableRoundKey, summarizeRecord } from './summary';
+import { mergeEndlessHistory, mergeHistory, stableRoundKey, summarizeRecord } from './summary';
 export type { GameRecord, PlayedHistory, RecordedRound, StatisticsGroup } from './types';
 
 const STORAGE_KEY = 'jakukyo.records.v1';
@@ -13,14 +14,32 @@ type StoragePort = Pick<Storage, 'getItem' | 'setItem'>;
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const isoNow = () => new Date().toISOString();
 const uid = () => typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const validHistoryHand = (value: unknown): boolean => {
+  if (!object(value) || typeof value.key !== 'string') return false;
+  return ['won', 'dealIn', 'riichi', 'openMeld'].every(key => typeof value[key] === 'boolean')
+    && ['winEvents', 'dealInEvents', 'winPointSum', 'pricedWins'].every(key => typeof value[key] === 'number' && Number.isFinite(value[key]) && (value[key] as number) >= 0);
+};
+const validEndlessHistory = (value: unknown): boolean => {
+  if (!object(value) || !Number.isSafeInteger(value.through) || Number(value.through) < 1 || !object(value.totals) || !validHistoryHand(value.lastHand)) return false;
+  const totals = value.totals;
+  return ['settledHands', 'wonHands', 'dealInHands', 'winEvents', 'dealInEvents', 'riichiHands', 'openMeldHands', 'winPointSum', 'pricedWins']
+    .every(key => typeof totals[key] === 'number' && Number.isFinite(totals[key]) && (totals[key] as number) >= 0);
+};
 const position = (save: SavedGame) => (save as SavedGame & { replayPosition?: number }).replayPosition ?? save.decisions.length;
 const configKey = (save: SavedGame) => {
   const parts = [save.mode ?? 'riichi', save.seed, save.matchLength, save.difficulty ?? 'standard', save.aiVersion ?? 1, save.variantOptions?.exchangeThree ?? false, save.variantOptions?.minimumFan ?? null];
   const starting = restoredStartPoints(save);
   // Keep historical resumeSession identities, including deleted old replays.
   if (starting !== restoredStartPoints({ mode: save.mode })) parts.push(starting);
+  if (save.matchLength === 'endless' && save.checkpoint) {
+    const cp = save.checkpoint;
+    parts.push('checkpoint', cp.sessionId, cp.sequence, cp.dealer, cp.rotation, cp.honba, cp.sticks, ...cp.points);
+  }
   return JSON.stringify(parts);
 };
+const endlessHandId = (save: SavedGame) => save.matchLength === 'endless' && save.checkpoint
+  ? `endless-hand:${JSON.stringify([save.checkpoint.sessionId, save.checkpoint.sequence])}` : undefined;
+const endlessHistoryId = (sessionId: string) => `endless-history:${JSON.stringify(sessionId)}`;
 const prefixMatches = (a: SavedGame, b: SavedGame) => configKey(a) === configKey(b)
   && a.decisions.slice(0, Math.min(a.decisions.length, b.decisions.length)).every((decision, index) => decision.key === b.decisions[index].key);
 const exactSave = (a: SavedGame, b: SavedGame) => prefixMatches(a, b) && a.decisions.length === b.decisions.length && position(a) === position(b);
@@ -32,7 +51,7 @@ function safeStorage(): StoragePort | null {
 /** Accept only this project's plain replay data, including the legacy 0.2.x shape. */
 export function validateSavedGame(value: unknown): SavedGame {
   if (!object(value) || value.version !== 1) throw new Error('不是支持的雀境牌谱版本。当前可导入版本 1 的牌谱。');
-  if (typeof value.seed !== 'string' || value.seed.length > 512 || !['single', 'east', 'hanchan'].includes(String(value.matchLength))) throw new Error('牌谱的随机种子或对局长度不完整。');
+  if (typeof value.seed !== 'string' || value.seed.length > 512 || !['single', 'east', 'hanchan', 'endless'].includes(String(value.matchLength))) throw new Error('牌谱的随机种子或对局长度不完整。');
   if (value.mode != null && !MODES.some(mode => mode.id === value.mode)) throw new Error('牌谱使用了当前版本不支持的玩法。');
   if (value.startPoints !== undefined && !validStartPoints(value.mode as ModeId | undefined, value.startPoints)) throw new Error('牌谱的初始分与当前玩法不兼容。');
   if (value.difficulty != null && !['novice', 'standard', 'advanced', 'expert'].includes(String(value.difficulty))) throw new Error('牌谱的电脑难度无效。');
@@ -52,6 +71,12 @@ export function validateSavedGame(value: unknown): SavedGame {
   if (value.autoExchangeThree !== undefined) save.autoExchangeThree = value.autoExchangeThree as boolean;
   if (value.aiVersion != null) save.aiVersion = Number(value.aiVersion);
   if (value.replayPosition != null) save.replayPosition = Number(value.replayPosition);
+  if (value.matchLength === 'endless') {
+    if (!validEndlessCheckpoint(value.checkpoint, save.mode)) throw new Error('无限牌谱缺少有效的单局起始信息。');
+    const cp = value.checkpoint;
+    save.checkpoint = { version: 1, sessionId: cp.sessionId, sequence: cp.sequence, points: [...cp.points],
+      dealer: cp.dealer, rotation: cp.rotation, honba: cp.honba, sticks: cp.sticks };
+  }
   if (object(value.variantOptions)) {
     save.variantOptions = {};
     if (typeof value.variantOptions.exchangeThree === 'boolean') save.variantOptions.exchangeThree = value.variantOptions.exchangeThree;
@@ -69,7 +94,8 @@ function settledRound(snapshot: GameSnapshot, actionIndex: number, overrideKey?:
 
 function newRecord(save: SavedGame, source: GameRecord['source'], title?: string): GameRecord {
   const mode = save.mode ?? 'riichi', now = isoNow();
-  return { id: uid(), title: title?.trim().slice(0, 60) || `${getMode(mode).name} · ${new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}`,
+  const hand = save.matchLength === 'endless' && save.checkpoint ? ` · 第${save.checkpoint.sequence}局` : '';
+  return { id: source === 'played' ? endlessHandId(save) ?? uid() : uid(), title: title?.trim().slice(0, 60) || `${getMode(mode).name}${hand} · ${new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}`,
     createdAt: now, updatedAt: now, source, favorite: false, mode, playerCount: mode === 'sanma' ? 3 : 4,
     scoreUnit: mode === 'riichi' || mode === 'sanma' ? '点' : '分', save: structuredClone(save), completed: false, rounds: [] };
 }
@@ -80,7 +106,7 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
   let visible: readonly GameRecord[] = [], error: string | null = null, timer: ReturnType<typeof setTimeout> | null = null, dirty = false;
   let visibleHistory: readonly PlayedHistory[] = [];
   let resumeSession: { id: string; config: string } | undefined;
-  const notify = () => { visible = [...records.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); visibleHistory = [...history.values()]; for (const listener of listeners) listener(); };
+  const notify = () => { visible = [...records.values()].reverse().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); visibleHistory = [...history.values()]; for (const listener of listeners) listener(); };
   try {
     const raw = storage?.getItem(STORAGE_KEY);
     if (raw) {
@@ -102,6 +128,7 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
         for (const entry of parsed.history) {
           if (!object(entry) || typeof entry.id !== 'string' || !MODES.some(mode => mode.id === entry.mode) || !Array.isArray(entry.hands) || !Number.isInteger(entry.playerCount)) continue;
           if (entry.hands.some(hand => !object(hand) || typeof hand.key !== 'string' || !Number.isFinite(hand.winEvents) || !Number.isFinite(hand.winPointSum))) continue;
+          if (entry.endless !== undefined && (!validEndlessHistory(entry.endless) || entry.hands.length !== 0)) continue;
           history.set(entry.id, entry as unknown as PlayedHistory);
         }
       } else {
@@ -114,18 +141,20 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
   notify();
 
   function prune() {
-    const recent = [...records.values()].filter(record => !record.favorite && !active.has(record.id)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    for (const record of recent.slice(KEEP_RECENT)) records.delete(record.id);
+    const activeRecent = [...records.values()].filter(record => !record.favorite && active.has(record.id)).length;
+    const recent = [...records.values()].reverse().filter(record => !record.favorite && !active.has(record.id)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    for (const record of recent.slice(Math.max(0, KEEP_RECENT - activeRecent))) records.delete(record.id);
   }
   function flushRecords() {
     if (timer) { clearTimeout(timer); timer = null; }
-    if (!dirty) return;
+    if (!dirty) return !!storage && !error;
     prune();
     if (storage) {
       try { storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, records: [...records.values()], history: [...history.values()], resumeSession })); error = null; dirty = false; }
       catch { error = '牌谱未能写入本地空间，最新记录仍在本次运行的内存中。请先导出需要保留的牌谱，再清理空间。'; }
     } else { error = '此环境无法使用本地牌谱存储，记录仅保留到本次运行结束。'; }
     notify();
+    return !!storage && !dirty && !error;
   }
   function changed(immediate = false) {
     dirty = true;
@@ -134,7 +163,9 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
   }
   function beginRecord(saved: SavedGame, options: { resume?: boolean } = {}) {
     const save = validateSavedGame(saved);
-    let record = options.resume ? [...records.values()].filter(item => item.source === 'played' && prefixMatches(item.save, save)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] : undefined;
+    const handId = endlessHandId(save);
+    let record = handId ? records.get(handId) : options.resume ? [...records.values()].filter(item => item.source === 'played' && prefixMatches(item.save, save)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] : undefined;
+    if (handId && record && (record.source !== 'played' || !prefixMatches(record.save, save))) throw new Error('无限对局当前牌谱与已保存的本局记录不一致。');
     if (!record) {
       record = newRecord(save, 'played');
       // A user may delete the replay while retaining the current game save. Keep
@@ -151,6 +182,12 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
   }
   function observeRecord(id: string, save: SavedGame, snapshot: GameSnapshot) {
     const old = records.get(id); if (!old || old.source !== 'played') return;
+    if (old.save.matchLength === 'endless' || save.matchLength === 'endless') {
+      if (!validEndlessCheckpoint(save.checkpoint, save.mode) || endlessHandId(save) !== id
+        || configKey(old.save) !== configKey(save) || snapshot.round.sequence !== save.checkpoint.sequence) {
+        throw new Error('无限对局牌谱与当前局不一致。');
+      }
+    }
     const record: GameRecord = { ...old, save: structuredClone(save), updatedAt: isoNow(), mode: snapshot.mode ?? 'riichi', playerCount: snapshot.players.length, scoreUnit: snapshot.scoreUnit ?? old.scoreUnit };
     const round = settledRound(snapshot, position(save));
     let important = false;
@@ -166,7 +203,13 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
       record.completed = true; record.completedAt = old.completedAt ?? isoNow();
       record.finalScores = [...snapshot.result.scores]; record.finalRanks = snapshot.result.ranks ? [...snapshot.result.ranks] : undefined;
     }
-    if (important) history.set(id, mergeHistory(history.get(id), summarizeRecord(record)));
+    if (important) {
+      if (save.matchLength === 'endless' && save.checkpoint) {
+        const historyId = endlessHistoryId(save.checkpoint.sessionId);
+        const summary = { ...summarizeRecord(record), id: historyId };
+        history.set(historyId, mergeEndlessHistory(history.get(historyId), summary, save.checkpoint.sequence));
+      } else history.set(id, mergeHistory(history.get(id), summarizeRecord(record)));
+    }
     records.set(id, record); changed(important);
   }
   const requireRecord = (id: string) => { const record = records.get(id); if (!record) throw new Error('这份牌谱已不在本地库中。'); return record; };
