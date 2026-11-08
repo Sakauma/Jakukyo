@@ -18,7 +18,7 @@ for item in src public desktop docs; do
     cp -a "$SOURCE_ROOT/$item/." "$BUILD_ROOT/$item/"
   fi
 done
-cp "$SOURCE_ROOT/package.json" "$SOURCE_ROOT/package-lock.json" "$SOURCE_ROOT/tsconfig.json" "$SOURCE_ROOT/vite.config.ts" "$SOURCE_ROOT/index.html" "$SOURCE_ROOT/THIRD_PARTY_NOTICES.md" "$BUILD_ROOT/"
+cp "$SOURCE_ROOT/package.json" "$SOURCE_ROOT/package-lock.json" "$SOURCE_ROOT/tsconfig.json" "$SOURCE_ROOT/vite.config.ts" "$SOURCE_ROOT/index.html" "$BUILD_ROOT/"
 cd "$BUILD_ROOT"
 if ! cmp -s package-lock.json .installed-lock.json || ! test -d node_modules; then
   npm ci --ignore-scripts --no-audit --no-fund

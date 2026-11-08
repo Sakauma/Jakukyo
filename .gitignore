@@ -7,3 +7,6 @@ dist/
 .desktop-staging/
 .electron-cache/
 release/
+/启动游戏.cmd
+/打包Windows.cmd
+/THIRD_PARTY_NOTICES.md

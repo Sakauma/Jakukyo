@@ -24,7 +24,6 @@ await rm(staging, { recursive: true, force: true }); await mkdir(staging, { recu
 await mkdir(versionOutput, { recursive: true });
 await cp(join(root, 'dist'), join(staging, 'dist'), { recursive: true });
 await cp(join(root, 'desktop', 'main.cjs'), join(staging, 'main.cjs'));
-await cp(join(root, 'THIRD_PARTY_NOTICES.md'), join(staging, 'THIRD_PARTY_NOTICES.md'));
 await writeFile(join(staging, 'THIRD-PARTY-LICENSES.txt'), await collectLicenses(root));
 await createIcon(join(staging, 'icon.ico'));
 await writeFile(join(staging, 'package.json'), JSON.stringify({ name: 'jakukyo-desktop', productName: '雀境', version: appVersion, main: 'main.cjs', description: 'Offline 3D Mahjong', license: 'UNLICENSED' }, null, 2));
@@ -38,7 +37,6 @@ const [directory] = await packager({
 });
 const instructions = `雀境 · 3D 麻将馆 ${appVersion}\r\n\r\n解压整个文件夹后，双击 Jakukyo.exe。无需安装 Node.js，无需联网。\r\n请保留 exe 同目录下的资源文件，不能只移动 exe。\r\n存档位于 Windows 用户的 AppData/Roaming/Jakukyo。\r\n四种牌桌主题、四级电脑难度，具体玩法与桌规见游戏大厅和规则面板。\r\n\r\n此包由 WSL ${process.env.WSL_DISTRO_NAME} 中现有 Node ${process.version} 构建。\r\nElectron ${electronVersion} / Windows x64。\r\n`;
 await writeFile(join(directory, '开始游玩.txt'), instructions, 'utf8');
-await cp(join(root, 'THIRD_PARTY_NOTICES.md'), join(directory, 'THIRD_PARTY_NOTICES.md'));
 await cp(join(staging, 'THIRD-PARTY-LICENSES.txt'), join(directory, 'THIRD-PARTY-LICENSES.txt'));
 const archive = join(output, `Jakukyo-${appVersion}-Windows-x64.zip`);
 await rm(archive, { force: true });
