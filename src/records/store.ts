@@ -2,6 +2,7 @@ import type { GameSnapshot, ModeId, SavedGame } from '../game/types';
 import { MODES, getMode } from '../game/catalog';
 import { restoredStartPoints, validStartPoints } from '../game/startingPoints';
 import { validEndlessCheckpoint } from '../game/endlessCheckpoint';
+import { normalizeSichuanOptions, validSichuanOptions } from '../game/variants/sichuan';
 import type { GameRecord, PlayedHistory, RecordedRound } from './types';
 import { mergeEndlessHistory, mergeHistory, stableRoundKey, summarizeRecord } from './summary';
 export type { GameRecord, PlayedHistory, RecordedRound, StatisticsGroup } from './types';
@@ -31,6 +32,11 @@ const configKey = (save: SavedGame) => {
   const starting = restoredStartPoints(save);
   // Keep historical resumeSession identities, including deleted old replays.
   if (starting !== restoredStartPoints({ mode: save.mode })) parts.push(starting);
+  // Historical saves and their equivalent explicit v1 share the old key.
+  if (save.variantOptions?.sichuan !== undefined) {
+    const rules = normalizeSichuanOptions(save.variantOptions.sichuan);
+    if (rules.version !== 1) parts.push('sichuan', rules.version, rules.fanCap, rules.selfDraw, rules.menqingZhongzhang);
+  }
   if (save.matchLength === 'endless' && save.checkpoint) {
     const cp = save.checkpoint;
     parts.push('checkpoint', cp.sessionId, cp.sequence, cp.dealer, cp.rotation, cp.honba, cp.sticks, ...cp.points);
@@ -77,10 +83,15 @@ export function validateSavedGame(value: unknown): SavedGame {
     save.checkpoint = { version: 1, sessionId: cp.sessionId, sequence: cp.sequence, points: [...cp.points],
       dealer: cp.dealer, rotation: cp.rotation, honba: cp.honba, sticks: cp.sticks };
   }
+  if (value.variantOptions !== undefined && !object(value.variantOptions)) throw new Error('牌谱桌规配置无效。');
   if (object(value.variantOptions)) {
     save.variantOptions = {};
     if (typeof value.variantOptions.exchangeThree === 'boolean') save.variantOptions.exchangeThree = value.variantOptions.exchangeThree;
     if (typeof value.variantOptions.minimumFan === 'number' && Number.isFinite(value.variantOptions.minimumFan)) save.variantOptions.minimumFan = value.variantOptions.minimumFan;
+    if (value.variantOptions.sichuan !== undefined) {
+      if (!validSichuanOptions(value.variantOptions.sichuan)) throw new Error('牌谱的四川麻将桌规配置无效。');
+      save.variantOptions.sichuan = { ...value.variantOptions.sichuan };
+    }
   }
   return save;
 }

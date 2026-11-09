@@ -49,6 +49,8 @@
 .lobby-config>p.difficulty-description{font-size:10px;line-height:1.7;letter-spacing:0;color:var(--muted);margin:7px 0 8px;min-height:17px}
 .lobby-options{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center;margin:8px 0 10px;font-size:10px;color:var(--muted);min-height:32px}.lobby-options>label{display:flex;gap:10px;align-items:center;white-space:nowrap}
 .lobby-options select{font-size:11px;color:var(--cream);border:1px solid var(--border-color);border-radius:4px;background:var(--panel);padding:6px 9px}.lobby-options .text-button{font-size:11px;margin-left:auto}
+.sichuan-options{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin:6px 0 10px;color:var(--cream);font-size:12px}.sichuan-options>label{display:flex;align-items:center;gap:6px;white-space:nowrap}.sichuan-options select{color:var(--cream);background:var(--panel);border:1px solid var(--border-color);border-radius:4px;padding:6px 8px;font-size:12px}.sichuan-options input{accent-color:var(--gold)}
+.win-feedback-name small{color:var(--muted);font-size:12px;white-space:nowrap}
 .theme-dot{width:15px;height:15px;border:2px solid var(--gold);border-radius:50%;display:inline-block}.exchange-toggle{font-size:11px}.exchange-toggle input{accent-color:var(--gold)}
 .lobby-config .start-button{min-height:46px;padding:12px 18px;font-size:13px}.resume-button{background:var(--panel);color:var(--cream);border-color:var(--border-color);font-size:11px;margin-top:8px;padding:10px 17px}.resume-button span{color:var(--muted)}.resume-button:hover{background:var(--raised)}
 .lobby-stamp{color:var(--gold);right:4%;top:12%;opacity:.75}.lobby-stamp>span{border-color:var(--border-color)}.lobby-stamp>small{color:var(--muted)}

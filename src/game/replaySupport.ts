@@ -3,6 +3,7 @@ import { MODES } from './catalog';
 import type { GameSnapshot, ReplayFrame, SavedGame } from './types';
 import { validStartPoints } from './startingPoints';
 import { validEndlessCheckpoint } from './endlessCheckpoint';
+import { validSichuanOptions } from './variants/sichuan';
 
 export const MAX_REPLAY_STEPS = 100000;
 export const MAX_REPLAY_FRAMES = 8000;
@@ -27,9 +28,10 @@ export function validateReplayData(data: SavedGame): void {
   if (data.replayPosition != null && (!Number.isInteger(data.replayPosition) || data.replayPosition < 0 || data.replayPosition > MAX_REPLAY_STEPS)) {
     throw new Error('牌谱的结束位置无效或超限。');
   }
-  if (data.variantOptions != null && (typeof data.variantOptions !== 'object'
+  if (data.variantOptions !== undefined && (!data.variantOptions || typeof data.variantOptions !== 'object' || Array.isArray(data.variantOptions)
     || (data.variantOptions.exchangeThree != null && typeof data.variantOptions.exchangeThree !== 'boolean')
-    || (data.variantOptions.minimumFan != null && (!Number.isFinite(data.variantOptions.minimumFan) || data.variantOptions.minimumFan < 0 || data.variantOptions.minimumFan > 1000)))) {
+    || (data.variantOptions.minimumFan != null && (!Number.isFinite(data.variantOptions.minimumFan) || data.variantOptions.minimumFan < 0 || data.variantOptions.minimumFan > 1000))
+    || (data.variantOptions.sichuan !== undefined && !validSichuanOptions(data.variantOptions.sichuan)))) {
     throw new Error('牌谱桌规选项无效。');
   }
 }

@@ -93,6 +93,9 @@ function WinDetail({ winner, snapshot, theme, history, revealed, progress }: { w
   const kind = winner.fromId == null ? '自摸' : isJapanese(mode) ? '荣和' : '点和';
   const gain = actualGain(winner);
   const hasPayments = winner.payments?.length === snapshot.players.length;
+  const sichuan = mode.startsWith('sichuan') ? winner.sichuanScore ?? {
+    fanCap: 4, effectiveFan: Math.min(4, winner.han), multiplier: 2 ** Math.min(4, winner.han), selfDrawBonus: winner.fromId == null ? 1 : 0,
+  } : null;
 
   return <article className="settlement-win-detail">
     <div className="settlement-winner-heading">
@@ -115,7 +118,7 @@ function WinDetail({ winner, snapshot, theme, history, revealed, progress }: { w
             {winner.yakuman > 0 ? <><strong>{winner.yakuman > 1 ? winner.yakuman : ''}</strong><span>{winner.yakuman > 1 ? '倍役满' : '役满'}</span></> : <><strong>{format(winner.han)}</strong><span>{countedUnit(mode)}</span></>}
             {isJapanese(mode) && winner.fu > 0 && <small>{format(winner.fu)} 符</small>}
           </div>
-          <div className="settlement-value-copy"><span>{winner.yakuman > 0 ? '役满和牌' : pointModes.has(mode) ? '基础计分' : mode === 'taiwan' ? '台数合计' : '番数合计'}</span><p>{winner.yakuman > 0 ? '按本局役满结果结算' : isJapanese(mode) ? `${winner.fu > 0 ? `${format(winner.fu)} 符 · ` : ''}${format(winner.han)} 番` : `${format(winner.han)} ${countedUnit(mode)}`}</p></div>
+          <div className="settlement-value-copy">{sichuan ? <><span>番数合计</span><p>{format(winner.han)} 番{typeof sichuan.fanCap === 'number' && sichuan.effectiveFan < winner.han ? ` · 按 ${format(sichuan.fanCap)} 番封顶` : ''} · {format(sichuan.multiplier)} 倍</p>{sichuan.selfDrawBonus > 0 && <p>自摸每家 +{format(sichuan.selfDrawBonus)} 底</p>}</> : <><span>{winner.yakuman > 0 ? '役满和牌' : pointModes.has(mode) ? '基础计分' : mode === 'taiwan' ? '台数合计' : '番数合计'}</span><p>{winner.yakuman > 0 ? '按本局役满结果结算' : isJapanese(mode) ? `${winner.fu > 0 ? `${format(winner.fu)} 符 · ` : ''}${format(winner.han)} 番` : `${format(winner.han)} ${countedUnit(mode)}`}</p></>}</div>
         </div>
         {hasPayments && <div className="settlement-payments"><div className="settlement-section-label"><span>本次分配</span><small>{unit}</small></div>{snapshot.players.map(item => {
           const value = winner.payments![item.id] ?? 0;

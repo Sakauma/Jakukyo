@@ -49,8 +49,11 @@ export function WinFeedback({ event, snapshot, reduced, onDone }: WinFeedbackPro
         {event.winners.map(winner => {
           const player = snapshot.players.find(item => item.id === winner.playerId);
           const gain = winner.payments?.[winner.playerId] ?? event.deltas[winner.playerId] ?? winner.points;
+          const sichuan = snapshot.mode?.startsWith('sichuan') ? winner.sichuanScore ?? {
+            fanCap: 4, effectiveFan: Math.min(4, winner.han), multiplier: 2 ** Math.min(4, winner.han), selfDrawBonus: winner.fromId == null ? 1 : 0,
+          } : null;
           return <li key={winner.playerId}>
-            <span className="win-feedback-name"><span className="win-feedback-wind">{player?.wind ?? '和'}</span>{player?.name ?? `玩家 ${winner.playerId + 1}`}</span>
+            <span className="win-feedback-name"><span className="win-feedback-wind">{player?.wind ?? '和'}</span>{player?.name ?? `玩家 ${winner.playerId + 1}`}{sichuan && <small>{winner.han} 番 · {sichuan.multiplier} 倍{typeof sichuan.fanCap === 'number' && sichuan.effectiveFan < winner.han ? '（封顶）' : ''}{sichuan.selfDrawBonus > 0 ? ` +${sichuan.selfDrawBonus} 底` : ''}</small>}</span>
             <span className="win-feedback-gain">{amount(gain)}<small>{unit}</small></span>
           </li>;
         })}

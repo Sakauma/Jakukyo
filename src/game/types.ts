@@ -54,6 +54,18 @@ export interface RoundView {
   wildcard?: TileCode;
 }
 export interface YakuView { name: string; han: number | string }
+export interface SichuanOptions {
+  version: 1 | 2;
+  fanCap: 3 | 4 | 5 | 6 | 8 | 'none';
+  selfDraw: 'base' | 'fan';
+  menqingZhongzhang: boolean;
+}
+export interface SichuanScore {
+  fanCap: SichuanOptions['fanCap'];
+  effectiveFan: number;
+  multiplier: number;
+  selfDrawBonus: number;
+}
 export interface WinnerView {
   playerId: number;
   fromId?: number;
@@ -68,6 +80,7 @@ export interface WinnerView {
   melds?: MeldView[];
   /** Actual deltas for this winner only, in fixed player ID order; includes awarded pot/honba. */
   payments?: number[];
+  sichuanScore?: SichuanScore;
 }
 export interface ConfirmedWinEvent {
   /** Unique within the running application, including repeated wins in a continuing hand. */
@@ -174,13 +187,14 @@ export interface GameSnapshot {
   scoreUnit?: '点' | '分' | '台';
   setupSelection?: string[];
   ruleSummary?: string[];
+  sichuanOptions?: SichuanOptions;
 }
 export interface SessionOptions {
   mode?: ModeId;
   difficulty?: Difficulty;
   /** Restore a supported table's original balance; new regional tables default to 100. */
   startPoints?: number;
-  variantOptions?: { exchangeThree?: boolean; minimumFan?: number };
+  variantOptions?: { exchangeThree?: boolean; minimumFan?: number; sichuan?: Partial<SichuanOptions> };
   seed?: string;
   /** Milliseconds between visible engine steps; 0 is useful for test automation. */
   speed?: number;

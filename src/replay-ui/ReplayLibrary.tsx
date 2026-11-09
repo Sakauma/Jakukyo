@@ -73,7 +73,7 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
           <label className="replay-reveal" title={frame.allHands ? undefined : '本局结束后可查看'}><input type="checkbox" checked={showHands && !!frame.allHands} disabled={!frame.allHands} onChange={event => setShowHands(event.target.checked)} />查看各家手牌</label>
           
           {!!snapshot.round.doraIndicators.length && <div className="replay-dora"><span>宝牌指示牌</span><div>{snapshot.round.doraIndicators.map((tile, at) => <TilePortrait key={at} tile={tile} theme={theme} />)}</div></div>}
-          {snapshot.result && <div className="replay-result"><strong>{displayScoringText(snapshot.result.title, snapshot.mode, playerNames)}</strong><p>{displayScoringText(snapshot.result.description, snapshot.mode, playerNames)}</p>{snapshot.result.winners.map((winner, at) => <p key={at}>{snapshot.players.find(player => player.id === winner.playerId)?.name} · {winner.han ? `${winner.han} 番` : ''}{winner.fu ? ` ${winner.fu} 符` : ''} · {winner.points.toLocaleString()} {snapshot.scoreUnit ?? '点'}</p>)}</div>}
+          {snapshot.result && <div className="replay-result"><strong>{displayScoringText(snapshot.result.title, snapshot.mode, playerNames)}</strong><p>{displayScoringText(snapshot.result.description, snapshot.mode, playerNames)}</p>{snapshot.result.winners.map((winner, at) => <p key={at}>{snapshot.players.find(player => player.id === winner.playerId)?.name} · {winner.han || snapshot.mode?.startsWith('sichuan') ? `${winner.han} 番` : ''}{winner.fu ? ` ${winner.fu} 符` : ''} · {winner.points.toLocaleString()} {snapshot.scoreUnit ?? '点'}</p>)}</div>}
         </aside>
       </div>
       <footer className="replay-controls">

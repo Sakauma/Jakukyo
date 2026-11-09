@@ -41,6 +41,10 @@
   .lobby-options{gap:8px;margin:6px 0;font-size:13px}
   .lobby-options>label,.exchange-policy-lobby{min-height:40px}
   .exchange-policy-lobby{font-size:13px}
+  .sichuan-options{gap:5px 10px;font-size:13px}
+  .sichuan-options>label{min-height:40px}
+  .sichuan-options select{min-height:40px;font-size:16px}
+  .sichuan-options input{width:18px;height:18px}
   .lobby-actions{position:sticky;z-index:2;bottom:-8px;display:flex;align-items:stretch;gap:6px;margin-top:7px;padding:7px 0 8px;background:var(--panel)}
   .lobby-config .start-button,.lobby-config .resume-button{width:auto;min-width:0;min-height:44px;margin:0;padding:8px 12px;font-size:13px;letter-spacing:0}
   .lobby-config .start-button{flex:1 1 auto}

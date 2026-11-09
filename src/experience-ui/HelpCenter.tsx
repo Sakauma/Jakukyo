@@ -47,9 +47,17 @@ function IllustratedGuide({ theme }: { theme: TableTheme }) {
   </section>;
 }
 
-export function HelpCenter({ mode, theme, onRules, initialLesson = 'controls' }: { mode?: ModeId; theme: TableTheme; onRules: () => void; initialLesson?: HelpLessonId }) {
+export function HelpCenter({ mode, theme, onRules, initialLesson = 'controls', sichuanRules, sichuanVersion }: { mode?: ModeId; theme: TableTheme; onRules: () => void; initialLesson?: HelpLessonId; sichuanRules?: string[]; sichuanVersion?: 1 | 2 }) {
   const [lesson, setLesson] = useState<HelpLessonId>(initialLesson);
   const activeMode = getMode(mode);
+  if (activeMode.id.startsWith('sichuan')) return <div className="help-center">
+    <nav className="help-lessons" aria-label="帮助主题"><button type="button" className="is-selected" aria-current="page"><strong>四川规则</strong></button></nav>
+    <div className="help-content">
+      <div className="help-lead"><h3>先定缺，再和牌。</h3><p>点击手牌选中，再点一次或使用“打出”按钮。大厅可设置下一场的计分规则。</p></div>
+      <ul className="rule-notes">{(sichuanRules ?? []).map(rule => <li key={rule}>{rule}</li>)}</ul>
+      <footer className="help-mode-note"><span>当前桌规：{activeMode.name} · {sichuanVersion === 1 ? '旧版川麻计番 v1' : '川麻扩展计番 v2'}</span><button type="button" onClick={onRules}>查看本桌规则 →</button></footer>
+    </div>
+  </div>;
   return <div className="help-center">
     <nav className="help-lessons" aria-label="帮助主题">{lessons.map(item => <button type="button" key={item.id} aria-pressed={lesson === item.id} className={lesson === item.id ? 'is-selected' : ''} onClick={() => setLesson(item.id)}><strong>{item.name}</strong></button>)}</nav>
     <div className="help-content">
