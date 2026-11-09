@@ -15,6 +15,16 @@
 .river-match-summary span{font-size:10px;line-height:1.6;color:var(--muted)}
 .river-history header .river-match-count{display:block;margin-top:5px;color:var(--gold);font-size:10px;font-weight:500}
 .river-overview{width:min(830px,calc(100vw - 50px))}
+.my-seat{position:relative}
+.seat-flowers{position:absolute;z-index:3;display:flex;gap:2px;width:max-content;padding:3px;border:1px solid var(--border-color);border-radius:5px;background:color-mix(in srgb,var(--panel) 94%,transparent);box-shadow:0 3px 10px #0004;pointer-events:none}
+.seat-flowers .tile-portrait{--tile-width:24px;border-radius:3px}
+.seat-flowers>.seat-flowers-owner{display:grid;place-items:center;flex:none;width:24px;border:1px solid var(--gold);border-radius:3px;background:var(--raised);color:var(--gold);font-family:"KaiTi",serif;font-size:16px}
+.seat-1>.seat-flowers,.replay-seat-1>.seat-flowers{top:calc(100% + 4px);right:0}
+.seat-2>.seat-flowers{top:0;right:calc(100% + 4px)}
+.replay-seat-2>.seat-flowers{top:0;left:calc(100% + 4px)}
+.seat-3>.seat-flowers,.replay-seat-3>.seat-flowers{bottom:calc(100% + 4px);left:0}
+.my-seat>.seat-flowers,.replay-seat-0>.seat-flowers{bottom:calc(100% + 8px);left:0}
+@media (orientation:landscape) and (max-height:500px) and (max-width:1100px){.seat-flowers .tile-portrait{--tile-width:21px}}
 .river-overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px 25px}
 .river-history{min-width:0;padding:14px;border:1px solid var(--border-color);background:color-mix(in srgb,var(--surface) 45%,transparent);border-radius:8px}
 .river-history header{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:14px;font-size:12px;color:var(--cream)}

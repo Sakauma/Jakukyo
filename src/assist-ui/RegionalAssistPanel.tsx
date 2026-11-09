@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { GameSessionAPI, GameSnapshot, HandTile, RonNotice } from '../game/types';
+import { publicWaitCounts } from '../game/assist/publicWaitCounts';
 import { TilePortrait } from '../table/TilePortrait';
 import { tileName } from '../table/tileTextures';
 import type { TableTheme } from '../table/themes';
@@ -59,12 +60,13 @@ export function RegionalAssistPanel({ snapshot, session, selectedTile, notice, t
   else status = '暂无听张';
 
   const heading = winAction ? '和牌机会' : ready ? '听张' : distance != null && distance > 0 ? `${distance} 向听` : '';
-  const displayedWaits = showDetails && !winAction && !wonBloodBattle ? waits : [];
+  const displayedWaits = showDetails && !winAction && !wonBloodBattle ? publicWaitCounts(snapshot, waits) : [];
+  const totalUnseen = displayedWaits.reduce((total, wait) => total + wait.unseen, 0);
   return <section className={`riichi-assist ${displayedWaits.length > 6 ? 'has-many-waits' : ''} ${reasons.length && !winAction ? 'has-furiten' : ''}`} aria-label="和牌与听牌提示">
-    <div className="assist-summary"><span>{title}</span>{showDetails && heading && <strong>{heading}</strong>}</div>
+    <div className="assist-summary"><span>{title}</span>{showDetails && heading && <strong>{heading}{displayedWaits.length > 0 && ` · 共${totalUnseen}张`}</strong>}</div>
     <div className={`assist-status ${winAction ? 'has-yaku' : ''} ${reasons.length && !winAction || voidStatus ? 'is-furiten' : ''}`} aria-label="和牌资格"><strong>{status}</strong>{preview && reasons.length > 0 && !winAction && <span>{reasonStatus}</span>}{voidStatus && <span>{voidStatus}</span>}{rule && <span className="regional-rule">{rule}</span>}</div>
-    {displayedWaits.length > 0 && <div className="assist-wait-area"><ul className="assist-waits" aria-label="牌形听张">{displayedWaits.map(tile =>
-      <li key={tile} title={tileName(tile)}><TilePortrait tile={tile} theme={theme} /><span><em>{tileName(tile)}</em></span></li>
+    {displayedWaits.length > 0 && <div className="assist-wait-area"><ul className="assist-waits" aria-label="牌形听张与公开未见数">{displayedWaits.map(wait =>
+      <li key={wait.tile} className={wait.unseen === 0 ? 'is-exhausted' : ''} title={`${tileName(wait.tile)} · 未见 ${wait.unseen} 张`}><TilePortrait tile={wait.tile} theme={theme} /><span><b>×{wait.unseen}</b><em>{tileName(wait.tile)}</em></span></li>
     )}</ul></div>}
   </section>;
 }

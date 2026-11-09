@@ -45,10 +45,11 @@ export function RiichiAssistPanel({ snapshot, selectedTile, riichiMode, theme, s
   const positive = !!legalWin || ready && (yakuCount > 0 || declaredYaku);
   const blocked = !legalWin && furiten.active;
   const displayedWaits = showDetails && !legalWin ? waits : [];
+  const totalUnseen = displayedWaits.reduce((total, wait) => total + wait.unseen, 0);
 
   const denseWaits = displayedWaits.length > 6;
   return <section className={`riichi-assist ${denseWaits ? 'has-many-waits' : ''} ${blocked ? 'has-furiten' : ''}`} aria-label="和牌资格与听牌提示">
-    <div className="assist-summary"><span>{title}</span>{visibleHeading && <strong>{visibleHeading}</strong>}</div>
+    <div className="assist-summary"><span>{title}</span>{visibleHeading && <strong>{visibleHeading}{displayedWaits.length > 0 && ` · 共${totalUnseen}张`}</strong>}</div>
     <div className={`assist-status ${positive ? 'has-yaku' : ''} ${blocked ? 'is-furiten' : ''}`} aria-label="和牌资格">
       <strong>{legalWin ? legalWin.type === 'tsumo' ? '可以自摸' : '可以荣和' : yakuStatus}</strong>
       {blocked && <span>{furiten.reasons.map(reason => furitenNames[reason]).join(' · ') || '振听'} · 不能荣和</span>}

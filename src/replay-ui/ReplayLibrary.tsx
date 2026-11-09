@@ -6,6 +6,7 @@ import type { ReplayFrame } from '../game/replay';
 import type { GameSnapshot } from '../game/types';
 import MahjongTable from '../table/MahjongTable';
 import { TilePortrait } from '../table/TilePortrait';
+import { SeatFlowers } from '../table/SeatFlowers';
 import { tableSeat } from '../table/themes';
 import type { TableTheme } from '../table/themes';
 import { deleteRecord, exportRecordJson, getRecordsError, importRecordJson, listRecords, renameRecord, subscribeRecords, toggleFavorite } from '../records/store';
@@ -63,7 +64,7 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
         <div className="replay-board" aria-label="牌谱三维回放">
           <MahjongTable snapshot={snapshot} selectedId={null} interactiveIds={[]} onSelect={() => {}} view={view} theme={theme} reducedMotion onFailure={() => setFailed3D(true)} onRestore={() => setFailed3D(false)} />
           <div className="replay-board-badge">回放 · {snapshot.round.wind}{snapshot.round.hand}局 · 余 {snapshot.round.tilesLeft}</div>
-          {snapshot.players.map(player => <div key={player.id} className={`replay-seat replay-seat-${tableSeat(player.id, snapshot.players.length)}`}><b>{player.wind} · {player.name}</b><span>{player.points.toLocaleString()} {snapshot.scoreUnit ?? '点'}</span></div>)}
+          {snapshot.players.map(player => <div key={player.id} className={`replay-seat replay-seat-${tableSeat(player.id, snapshot.players.length)}`}><b>{player.wind} · {player.name}</b><span>{player.points.toLocaleString()} {snapshot.scoreUnit ?? '点'}</span><SeatFlowers flowers={player.flowers} name={player.name} theme={theme} own={player.isHuman} /></div>)}
           {failed3D && <div className="replay-webgl-error">3D 画面暂不可用，请关闭本页后重新打开。</div>}
           <button className="replay-view-toggle" type="button" onClick={() => setView(view === 'perspective' ? 'overhead' : 'perspective')}>{view === 'perspective' ? '俯视牌桌' : '透视牌桌'}</button>
         </div>
