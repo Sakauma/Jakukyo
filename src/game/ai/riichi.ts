@@ -178,12 +178,29 @@ export function chooseRiichiAction(observation: BotObservation, actions: BotActi
       result.searchBudget = SEARCH_NODES;
     }
     const best = result.candidates[0];
-    // A safe concealed/added kan is a separate decision from discarding, with a public threat check.
-    const kan = actions.find(action => action.type === 'kan' && action.meld);
-    if (kan && difficulty !== 'novice') {
-      const threat = observation.players.some(player => player.id !== observation.ownId && (player.riichi || player.melds.length >= 3));
-      const next = hand.clone().gang(kan.meld);
-      if (!threat && observation.tilesLeft > 12 && Majiang.Util.xiangting(next) <= best.shanten && safeOpenYaku(next, observation)) return quick(kan, 'call');
+    // Keep the historical choice intact for deterministic replays of old opponents.
+    if (aiVersion < 4) {
+      const kan = actions.find(action => action.type === 'kan' && action.meld);
+      if (kan && difficulty !== 'novice') {
+        const threat = observation.players.some(player => player.id !== observation.ownId && (player.riichi || player.melds.length >= 3));
+        const next = hand.clone().gang(kan.meld);
+        if (!threat && observation.tilesLeft > 12 && Majiang.Util.xiangting(next) <= best.shanten && safeOpenYaku(next, observation)) return quick(kan, 'call');
+      }
+    } else if (actions.some(action => action.type === 'kan' && action.meld) && observation.tilesLeft > 12 && !observation.players.some(player => player.id !== observation.ownId && (player.riichi || player.melds.length >= 3))) {
+      // Compare the hand before the replacement draw to the best available discard.
+      const baseline = [...metrics].sort((a, b) => a.shanten - b.shanten || b.ukeire - a.ukeire)[0];
+      let baselineWaits: string[] | undefined;
+      for (const kan of actions.filter(action => action.type === 'kan' && action.meld)) {
+        const next = hand.clone().gang(kan.meld);
+        const distance = Majiang.Util.xiangting(next);
+        if (distance > baseline.shanten || !safeOpenYaku(next, observation)) continue;
+        if (distance === 0 && baseline.shanten === 0) {
+          baselineWaits ??= Majiang.Util.tingpai(hands.get(baseline.key)!) || [];
+          const waits = Majiang.Util.tingpai(next) || [];
+          if (baselineWaits!.some(tile => !waits.includes(tile))) continue;
+        }
+        return quick(kan, 'call');
+      }
     }
     return result;
   }

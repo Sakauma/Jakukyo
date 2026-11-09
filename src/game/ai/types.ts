@@ -1,7 +1,7 @@
 /** All AI input is a structured-clone-safe projection of one player's information. */
 export type Difficulty = 'novice' | 'standard' | 'advanced' | 'expert';
 
-export const AI_VERSION = 3;
+export const AI_VERSION = 4;
 export const DIFFICULTIES: ReadonlyArray<{ id: Difficulty; label: string; description: string }> = [
   { id: 'novice', label: '入门', description: '辨认搭子与孤张，适合熟悉规则。' },
   { id: 'standard', label: '标准', description: '计算向听与有效进张，选择有役的鸣牌。' },

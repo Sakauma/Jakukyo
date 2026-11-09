@@ -450,7 +450,37 @@ export class RegionalSession implements GameSessionAPI {
           candidate.lookahead=gain/Math.max(1,draws.length)*(this.profile.id==='sanma'?350:1);
         }
       }
-      const ranked=rankPublicCandidates(observation,candidates,difficulty);return discards.find(choice=>choice.key===ranked.key)||discards[0];
+      const ranked=rankPublicCandidates(observation,candidates,difficulty);
+      if((this.aiVersion>=4||player.id===0&&!this.replaying)&&choices.some(c=>c.type==='kan'&&(c.kind==='concealed'||c.kind==='added'))&&observation.tilesLeft>(this.profile.id==='sanma'?12:4)){
+        const baseline=[...candidates].sort((a,b)=>a.shanten-b.shanten||b.ukeire-a.ukeire)[0];
+        const baselineChoice=discards.find(choice=>choice.key===baseline.key)!;
+        const threat=observation.players.some(opponent=>opponent.id!==player.id&&!(this.profile.continuing==='blood'&&this.players[opponent.id].hasWon)&&(opponent.riichi||opponent.melds.filter(meld=>/[+=-]/.test(meld)).length>=3));
+        let baselineWaits:string[]|undefined;
+        for(const choice of choices.filter(c=>c.type==='kan'&&(c.kind==='concealed'||c.kind==='added'))){
+          if(choice.kind==='added'&&threat)continue;
+          const after=[...player.hand],melds=[...player.melds],removed:string[]=[];
+          for(let count=0;count<(choice.kind==='concealed'?4:1);count++){
+            const index=after.findIndex(tile=>norm(tile)===norm(choice.tile!));
+            if(index<0)break;removed.push(...after.splice(index,1));
+          }
+          if(removed.length!==(choice.kind==='concealed'?4:1))continue;
+          if(choice.kind==='concealed')melds.push({id:'candidate',type:'kan',tiles:removed,concealed:true});
+          else{
+            const index=choice.meldIndex!,previous=melds[index];
+            if(!previous||previous.type!=='pon')continue;
+            melds[index]={...previous,type:'kan',tiles:[...previous.tiles,...removed]};
+          }
+          const distance=this.distance(after,melds);
+          if(distance>baseline.shanten)continue;
+          if(distance===0&&baseline.shanten===0){
+            baselineWaits??=this.shapeWaits(player,evaluate(baselineChoice.index!).after,player.melds);
+            const waits=this.shapeWaits(player,after,melds);
+            if(baselineWaits.some(tile=>!waits.includes(tile)))continue;
+          }
+          return choice;
+        }
+      }
+      return discards.find(choice=>choice.key===ranked.key)||discards[0];
     }
     for(const choice of choices.filter(c=>['pon','chi','kan'].includes(c.type))){
       if(this.profile.id==='sanma'&&this.players.some(p=>p.id!==player.id&&p.riichi))continue;
