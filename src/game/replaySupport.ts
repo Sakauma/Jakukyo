@@ -19,9 +19,10 @@ export function validateReplayData(data: SavedGame): void {
     || (data.startPoints != null && !validStartPoints(data.mode, data.startPoints))
     || (data.autoPlayDifficulty != null && !validDifficulty(data.autoPlayDifficulty))
     || (data.autoExchangeThree != null && typeof data.autoExchangeThree !== 'boolean')) throw new Error('牌谱格式损坏或超出支持范围。');
-  if (data.aiVersion != null && !(data.mode == null || data.mode === 'riichi' ? [1, 2, 3, 4, 5, AI_VERSION] : [2, 3, 4, 5, AI_VERSION]).includes(data.aiVersion)) {
+  if (data.aiVersion != null && !(data.mode == null || data.mode === 'riichi' ? [1, 2, 3, 4, 5, 6, AI_VERSION] : [2, 3, 4, 5, 6, AI_VERSION]).includes(data.aiVersion)) {
     throw new Error('牌谱使用的电脑版本与当前游戏不兼容。');
   }
+  validateBotReplay(data);
   if (data.rulesVersion !== undefined && data.rulesVersion !== 1 && data.rulesVersion !== 2) throw new Error('牌谱使用了不支持的规则版本。');
   if (data.matchLength === 'endless' && !validEndlessCheckpoint(data.checkpoint, data.mode)) {
     throw new Error('无限对局牌谱缺少有效的单局起始信息。');
@@ -34,6 +35,29 @@ export function validateReplayData(data: SavedGame): void {
     || (data.variantOptions.minimumFan != null && (!Number.isFinite(data.variantOptions.minimumFan) || data.variantOptions.minimumFan < 0 || data.variantOptions.minimumFan > 1000))
     || (data.variantOptions.sichuan !== undefined && !validSichuanOptions(data.variantOptions.sichuan)))) {
     throw new Error('牌谱桌规选项无效。');
+  }
+}
+
+export function validateBotReplay(data: SavedGame): void {
+  if ((data.aiVersion ?? 0) < 7) return;
+  if (!Array.isArray(data.botDecisions) || data.botDecisions.length > MAX_REPLAY_STEPS * 3) throw new Error('牌谱缺少有效电脑操作记录。');
+  const next = new Map<string, number>();
+  for (const decision of data.botDecisions) {
+    if (!decision || !Number.isInteger(decision.step) || decision.step < 0 || decision.step > MAX_REPLAY_STEPS
+      || !Number.isInteger(decision.playerId) || decision.playerId < 1 || decision.playerId > (data.mode === 'sanma' ? 2 : 3)
+      || !Number.isInteger(decision.sequence) || typeof decision.key !== 'string' || decision.key.length > 500
+      || decision.source != null && !['algorithm', 'mcr-model-hybrid', 'riichi-model-hybrid'].includes(decision.source)) throw new Error('电脑操作记录无效。');
+    const prefix = `${decision.step}:${decision.playerId}`;
+    if (decision.sequence !== (next.get(prefix) || 0)) throw new Error('电脑操作顺序无效。');
+    next.set(prefix, decision.sequence + 1);
+  }
+  if (data.botDecisions.some(decision => decision.source === 'mcr-model-hybrid') && (data.mode !== 'mcr' || !data.aiModel)) {
+    throw new Error('模型操作记录缺少对应的模型身份。');
+  }
+  if (data.botDecisions.some(decision => decision.source === 'riichi-model-hybrid') && (data.mode != null && data.mode !== 'riichi' || !data.aiModel)) throw new Error('立直模型操作记录缺少对应模型身份。');
+  if (data.aiModel != null && (data.mode != null && !['mcr', 'riichi'].includes(data.mode) || typeof data.aiModel.id !== 'string' || data.aiModel.id.length > 100
+    || !/^[0-9a-f]{64}$/i.test(data.aiModel.sha256) || data.aiModel.featureVersion !== (data.mode === 'mcr' ? 1 : 2) || data.aiModel.policyVersion !== 1)) {
+    throw new Error('牌谱模型身份无效。');
   }
 }
 

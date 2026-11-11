@@ -134,7 +134,7 @@ export default function App() {
   const discardSequence = useRef(0);
   const highlightedTile = resolveRiverSelection(snapshot, handSelection?.id ?? null, handSelection?.scope ?? null);
   const selectedId = highlightedTile ? handSelection?.id ?? null : null;
-  const riverMatches = getRiverMatches(snapshot?.players ?? [], highlightedTile);
+  const riverMatches = getRiverMatches(snapshot?.players ?? [], highlightedTile, snapshot ?? undefined);
   const [riichiMode, setRiichiMode] = useState(false);
   const [panel, setPanel] = useState<'rules' | 'settings' | 'log' | 'themes' | null>(null);
   const [experiencePanel, setExperiencePanel] = useState<'library' | 'stats' | 'help' | null>(null);

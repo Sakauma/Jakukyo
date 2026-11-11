@@ -6,7 +6,7 @@ import { tileName } from './tileTextures';
 import { getRiverMatches } from '../presentation/riverMatches';
 
 export function RiverOverview({ snapshot, theme, onClose, highlightedTile = null }: { snapshot: GameSnapshot; theme: TableTheme; onClose: () => void; highlightedTile?: string | null }) {
-  const matches = getRiverMatches(snapshot.players, highlightedTile);
+  const matches = getRiverMatches(snapshot.players, highlightedTile, snapshot);
   return <div className="jakukyo-overlay" onClick={onClose}><section className="panel river-overview" role="dialog" aria-modal="true" aria-labelledby="river-title" onClick={event => event.stopPropagation()}>
     <button className="icon-button panel-close" aria-label="关闭牌河全览" onClick={onClose}>✕</button>
     <h2 id="river-title">牌河全览</h2>

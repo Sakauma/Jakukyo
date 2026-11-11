@@ -318,7 +318,7 @@ function Scene({ snapshot, selectedId, selectedIds = [], interactiveIds, display
   const dropTarget = human && riverLayout([...human.discards, { tile: 'm1', called: false, riichi: discardAction === 'riichi', tsumogiri: false }]).items.at(-1);
   const seats = snapshot?.players ?? Array.from({ length: playerCount }, (_, id) => ({ id, concealedCount: 13, revealedHand: undefined, melds: [] }));
   const reserve = !snapshot?.mode || ['riichi', 'sanma'].includes(snapshot.mode) ? 14 : 0;
-  const riverMatches = getRiverMatches(snapshot?.players ?? [], highlightedTile);
+  const riverMatches = getRiverMatches(snapshot?.players ?? [], highlightedTile, snapshot ?? undefined);
   return <>
     <StudioEnvironment />
     <color attach="background" args={[theme.background]} /><fog attach="fog" args={[theme.background, 28, 54]} />
@@ -352,7 +352,7 @@ function Scene({ snapshot, selectedId, selectedIds = [], interactiveIds, display
     })}
     {(snapshot?.players ?? []).map(player => <group key={`${motionFrame.identity}-public-${player.id}`} rotation={[0, tableSeat(player.id, playerCount) * Math.PI / 2, 0]}>
       {riverLayout(player.discards).items.map(discard => <Tile key={discard.sourceIndex} theme={theme} tile={discard.tile} position={discard.position} rotation={discard.rotation} scale={discard.scale} faded={discard.tsumogiri} matched={riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.pageIndices.includes(discard.sourceIndex)} animatePosition motion={motionFrame.motions.get(riverMotionKey(player.id, discard.sourceIndex))} reducedMotion={reducedMotion} />)}
-      {seatLayout(player.id === 0 ? ownHand : Array.from({ length: player.revealedHand?.length ?? player.concealedCount }, () => ({ drawn: false })), player.melds, player.id === 0, (snapshot?.handSize ?? 13) > 14).melds.map(tile => <Tile key={tile.key} theme={theme} tile={tile.tile} position={tile.position} rotation={tile.rotation} scale={tile.scale} matched={!!tile.tile && !!riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.meldIndices.some(index => index.meldIndex === tile.meldIndex && index.tileIndex === tile.tileIndex)} animatePosition motion={motionFrame.motions.get(meldMotionKey(player.id, tile.meldIndex, tile.tileIndex))} reducedMotion={reducedMotion} />)}
+      {seatLayout(player.id === 0 ? ownHand : Array.from({ length: player.revealedHand?.length ?? player.concealedCount }, () => ({ drawn: false })), player.melds, player.id === 0, (snapshot?.handSize ?? 13) > 14, !!snapshot?.hideOpponentConcealedKongs && player.id !== snapshot.humanId).melds.map(tile => <Tile key={tile.key} theme={theme} tile={tile.tile} position={tile.position} rotation={tile.rotation} scale={tile.scale} matched={!!tile.tile && !!riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.meldIndices.some(index => index.meldIndex === tile.meldIndex && index.tileIndex === tile.tileIndex)} animatePosition motion={motionFrame.motions.get(meldMotionKey(player.id, tile.meldIndex, tile.tileIndex))} reducedMotion={reducedMotion} />)}
       {Array.from({ length: player.kita ?? 0 }, (_, i) => <Tile key={`bonus-${i}`} theme={theme} tile="z4" position={bonusPosition(i)} rotation={[-Math.PI / 2, 0, 0]} scale={.58} motion={motionFrame.motions.get(bonusMotionKey(player.id, (player.flowers?.length ?? 0) + i))} reducedMotion={reducedMotion} />)}
       {player.riichi && <RiichiStick motion={motionFrame.motions.get(stickMotionKey(player.id))} reduced={reducedMotion} />}
     </group>)}

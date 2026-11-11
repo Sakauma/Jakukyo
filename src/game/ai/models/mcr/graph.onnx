@@ -1,0 +1,1990 @@
+	Jakukyo isolated model probe:»ä
+7
+stored.stem.weightfp32.stem.weight"Cast*	
+to 
+3
+stored.stem.biasfp32.stem.bias"Cast*	
+to 
+l
+observation
+fp32.stem.weight
+fp32.stem.biasstem.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+
+stem.output	stem.relu"Relu
+A
+stored.body.0.c1.weightfp32.body.0.c1.weight"Cast*	
+to 
+=
+stored.body.0.c1.biasfp32.body.0.c1.bias"Cast*	
+to 
+y
+	stem.relu
+fp32.body.0.c1.weight
+fp32.body.0.c1.biasbody.0.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.0.c1.outputbody.0.relu1"Relu
+A
+stored.body.0.c2.weightfp32.body.0.c2.weight"Cast*	
+to 
+=
+stored.body.0.c2.biasfp32.body.0.c2.bias"Cast*	
+to 
+|
+body.0.relu1
+fp32.body.0.c2.weight
+fp32.body.0.c2.biasbody.0.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+.
+	stem.relu
+body.0.c2.output
+body.0.sum"Add
+ 
+
+body.0.sumbody.0.relu2"Relu
+A
+stored.body.1.c1.weightfp32.body.1.c1.weight"Cast*	
+to 
+=
+stored.body.1.c1.biasfp32.body.1.c1.bias"Cast*	
+to 
+|
+body.0.relu2
+fp32.body.1.c1.weight
+fp32.body.1.c1.biasbody.1.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.1.c1.outputbody.1.relu1"Relu
+A
+stored.body.1.c2.weightfp32.body.1.c2.weight"Cast*	
+to 
+=
+stored.body.1.c2.biasfp32.body.1.c2.bias"Cast*	
+to 
+|
+body.1.relu1
+fp32.body.1.c2.weight
+fp32.body.1.c2.biasbody.1.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.0.relu2
+body.1.c2.output
+body.1.sum"Add
+ 
+
+body.1.sumbody.1.relu2"Relu
+A
+stored.body.2.c1.weightfp32.body.2.c1.weight"Cast*	
+to 
+=
+stored.body.2.c1.biasfp32.body.2.c1.bias"Cast*	
+to 
+|
+body.1.relu2
+fp32.body.2.c1.weight
+fp32.body.2.c1.biasbody.2.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.2.c1.outputbody.2.relu1"Relu
+A
+stored.body.2.c2.weightfp32.body.2.c2.weight"Cast*	
+to 
+=
+stored.body.2.c2.biasfp32.body.2.c2.bias"Cast*	
+to 
+|
+body.2.relu1
+fp32.body.2.c2.weight
+fp32.body.2.c2.biasbody.2.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.1.relu2
+body.2.c2.output
+body.2.sum"Add
+ 
+
+body.2.sumbody.2.relu2"Relu
+A
+stored.body.3.c1.weightfp32.body.3.c1.weight"Cast*	
+to 
+=
+stored.body.3.c1.biasfp32.body.3.c1.bias"Cast*	
+to 
+|
+body.2.relu2
+fp32.body.3.c1.weight
+fp32.body.3.c1.biasbody.3.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.3.c1.outputbody.3.relu1"Relu
+A
+stored.body.3.c2.weightfp32.body.3.c2.weight"Cast*	
+to 
+=
+stored.body.3.c2.biasfp32.body.3.c2.bias"Cast*	
+to 
+|
+body.3.relu1
+fp32.body.3.c2.weight
+fp32.body.3.c2.biasbody.3.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.2.relu2
+body.3.c2.output
+body.3.sum"Add
+ 
+
+body.3.sumbody.3.relu2"Relu
+A
+stored.body.4.c1.weightfp32.body.4.c1.weight"Cast*	
+to 
+=
+stored.body.4.c1.biasfp32.body.4.c1.bias"Cast*	
+to 
+|
+body.3.relu2
+fp32.body.4.c1.weight
+fp32.body.4.c1.biasbody.4.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.4.c1.outputbody.4.relu1"Relu
+A
+stored.body.4.c2.weightfp32.body.4.c2.weight"Cast*	
+to 
+=
+stored.body.4.c2.biasfp32.body.4.c2.bias"Cast*	
+to 
+|
+body.4.relu1
+fp32.body.4.c2.weight
+fp32.body.4.c2.biasbody.4.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.3.relu2
+body.4.c2.output
+body.4.sum"Add
+ 
+
+body.4.sumbody.4.relu2"Relu
+A
+stored.body.5.c1.weightfp32.body.5.c1.weight"Cast*	
+to 
+=
+stored.body.5.c1.biasfp32.body.5.c1.bias"Cast*	
+to 
+|
+body.4.relu2
+fp32.body.5.c1.weight
+fp32.body.5.c1.biasbody.5.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.5.c1.outputbody.5.relu1"Relu
+A
+stored.body.5.c2.weightfp32.body.5.c2.weight"Cast*	
+to 
+=
+stored.body.5.c2.biasfp32.body.5.c2.bias"Cast*	
+to 
+|
+body.5.relu1
+fp32.body.5.c2.weight
+fp32.body.5.c2.biasbody.5.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.4.relu2
+body.5.c2.output
+body.5.sum"Add
+ 
+
+body.5.sumbody.5.relu2"Relu
+A
+stored.body.6.c1.weightfp32.body.6.c1.weight"Cast*	
+to 
+=
+stored.body.6.c1.biasfp32.body.6.c1.bias"Cast*	
+to 
+|
+body.5.relu2
+fp32.body.6.c1.weight
+fp32.body.6.c1.biasbody.6.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.6.c1.outputbody.6.relu1"Relu
+A
+stored.body.6.c2.weightfp32.body.6.c2.weight"Cast*	
+to 
+=
+stored.body.6.c2.biasfp32.body.6.c2.bias"Cast*	
+to 
+|
+body.6.relu1
+fp32.body.6.c2.weight
+fp32.body.6.c2.biasbody.6.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.5.relu2
+body.6.c2.output
+body.6.sum"Add
+ 
+
+body.6.sumbody.6.relu2"Relu
+A
+stored.body.7.c1.weightfp32.body.7.c1.weight"Cast*	
+to 
+=
+stored.body.7.c1.biasfp32.body.7.c1.bias"Cast*	
+to 
+|
+body.6.relu2
+fp32.body.7.c1.weight
+fp32.body.7.c1.biasbody.7.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.7.c1.outputbody.7.relu1"Relu
+A
+stored.body.7.c2.weightfp32.body.7.c2.weight"Cast*	
+to 
+=
+stored.body.7.c2.biasfp32.body.7.c2.bias"Cast*	
+to 
+|
+body.7.relu1
+fp32.body.7.c2.weight
+fp32.body.7.c2.biasbody.7.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.6.relu2
+body.7.c2.output
+body.7.sum"Add
+ 
+
+body.7.sumbody.7.relu2"Relu
+A
+stored.body.8.c1.weightfp32.body.8.c1.weight"Cast*	
+to 
+=
+stored.body.8.c1.biasfp32.body.8.c1.bias"Cast*	
+to 
+|
+body.7.relu2
+fp32.body.8.c1.weight
+fp32.body.8.c1.biasbody.8.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.8.c1.outputbody.8.relu1"Relu
+A
+stored.body.8.c2.weightfp32.body.8.c2.weight"Cast*	
+to 
+=
+stored.body.8.c2.biasfp32.body.8.c2.bias"Cast*	
+to 
+|
+body.8.relu1
+fp32.body.8.c2.weight
+fp32.body.8.c2.biasbody.8.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.7.relu2
+body.8.c2.output
+body.8.sum"Add
+ 
+
+body.8.sumbody.8.relu2"Relu
+A
+stored.body.9.c1.weightfp32.body.9.c1.weight"Cast*	
+to 
+=
+stored.body.9.c1.biasfp32.body.9.c1.bias"Cast*	
+to 
+|
+body.8.relu2
+fp32.body.9.c1.weight
+fp32.body.9.c1.biasbody.9.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+&
+body.9.c1.outputbody.9.relu1"Relu
+A
+stored.body.9.c2.weightfp32.body.9.c2.weight"Cast*	
+to 
+=
+stored.body.9.c2.biasfp32.body.9.c2.bias"Cast*	
+to 
+|
+body.9.relu1
+fp32.body.9.c2.weight
+fp32.body.9.c2.biasbody.9.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+1
+body.8.relu2
+body.9.c2.output
+body.9.sum"Add
+ 
+
+body.9.sumbody.9.relu2"Relu
+C
+stored.body.10.c1.weightfp32.body.10.c1.weight"Cast*	
+to 
+?
+stored.body.10.c1.biasfp32.body.10.c1.bias"Cast*	
+to 
+
+body.9.relu2
+fp32.body.10.c1.weight
+fp32.body.10.c1.biasbody.10.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.10.c1.outputbody.10.relu1"Relu
+C
+stored.body.10.c2.weightfp32.body.10.c2.weight"Cast*	
+to 
+?
+stored.body.10.c2.biasfp32.body.10.c2.bias"Cast*	
+to 
+€
+body.10.relu1
+fp32.body.10.c2.weight
+fp32.body.10.c2.biasbody.10.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+3
+body.9.relu2
+body.10.c2.outputbody.10.sum"Add
+"
+body.10.sumbody.10.relu2"Relu
+C
+stored.body.11.c1.weightfp32.body.11.c1.weight"Cast*	
+to 
+?
+stored.body.11.c1.biasfp32.body.11.c1.bias"Cast*	
+to 
+€
+body.10.relu2
+fp32.body.11.c1.weight
+fp32.body.11.c1.biasbody.11.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.11.c1.outputbody.11.relu1"Relu
+C
+stored.body.11.c2.weightfp32.body.11.c2.weight"Cast*	
+to 
+?
+stored.body.11.c2.biasfp32.body.11.c2.bias"Cast*	
+to 
+€
+body.11.relu1
+fp32.body.11.c2.weight
+fp32.body.11.c2.biasbody.11.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.10.relu2
+body.11.c2.outputbody.11.sum"Add
+"
+body.11.sumbody.11.relu2"Relu
+C
+stored.body.12.c1.weightfp32.body.12.c1.weight"Cast*	
+to 
+?
+stored.body.12.c1.biasfp32.body.12.c1.bias"Cast*	
+to 
+€
+body.11.relu2
+fp32.body.12.c1.weight
+fp32.body.12.c1.biasbody.12.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.12.c1.outputbody.12.relu1"Relu
+C
+stored.body.12.c2.weightfp32.body.12.c2.weight"Cast*	
+to 
+?
+stored.body.12.c2.biasfp32.body.12.c2.bias"Cast*	
+to 
+€
+body.12.relu1
+fp32.body.12.c2.weight
+fp32.body.12.c2.biasbody.12.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.11.relu2
+body.12.c2.outputbody.12.sum"Add
+"
+body.12.sumbody.12.relu2"Relu
+C
+stored.body.13.c1.weightfp32.body.13.c1.weight"Cast*	
+to 
+?
+stored.body.13.c1.biasfp32.body.13.c1.bias"Cast*	
+to 
+€
+body.12.relu2
+fp32.body.13.c1.weight
+fp32.body.13.c1.biasbody.13.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.13.c1.outputbody.13.relu1"Relu
+C
+stored.body.13.c2.weightfp32.body.13.c2.weight"Cast*	
+to 
+?
+stored.body.13.c2.biasfp32.body.13.c2.bias"Cast*	
+to 
+€
+body.13.relu1
+fp32.body.13.c2.weight
+fp32.body.13.c2.biasbody.13.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.12.relu2
+body.13.c2.outputbody.13.sum"Add
+"
+body.13.sumbody.13.relu2"Relu
+C
+stored.body.14.c1.weightfp32.body.14.c1.weight"Cast*	
+to 
+?
+stored.body.14.c1.biasfp32.body.14.c1.bias"Cast*	
+to 
+€
+body.13.relu2
+fp32.body.14.c1.weight
+fp32.body.14.c1.biasbody.14.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.14.c1.outputbody.14.relu1"Relu
+C
+stored.body.14.c2.weightfp32.body.14.c2.weight"Cast*	
+to 
+?
+stored.body.14.c2.biasfp32.body.14.c2.bias"Cast*	
+to 
+€
+body.14.relu1
+fp32.body.14.c2.weight
+fp32.body.14.c2.biasbody.14.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.13.relu2
+body.14.c2.outputbody.14.sum"Add
+"
+body.14.sumbody.14.relu2"Relu
+C
+stored.body.15.c1.weightfp32.body.15.c1.weight"Cast*	
+to 
+?
+stored.body.15.c1.biasfp32.body.15.c1.bias"Cast*	
+to 
+€
+body.14.relu2
+fp32.body.15.c1.weight
+fp32.body.15.c1.biasbody.15.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.15.c1.outputbody.15.relu1"Relu
+C
+stored.body.15.c2.weightfp32.body.15.c2.weight"Cast*	
+to 
+?
+stored.body.15.c2.biasfp32.body.15.c2.bias"Cast*	
+to 
+€
+body.15.relu1
+fp32.body.15.c2.weight
+fp32.body.15.c2.biasbody.15.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.14.relu2
+body.15.c2.outputbody.15.sum"Add
+"
+body.15.sumbody.15.relu2"Relu
+C
+stored.body.16.c1.weightfp32.body.16.c1.weight"Cast*	
+to 
+?
+stored.body.16.c1.biasfp32.body.16.c1.bias"Cast*	
+to 
+€
+body.15.relu2
+fp32.body.16.c1.weight
+fp32.body.16.c1.biasbody.16.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.16.c1.outputbody.16.relu1"Relu
+C
+stored.body.16.c2.weightfp32.body.16.c2.weight"Cast*	
+to 
+?
+stored.body.16.c2.biasfp32.body.16.c2.bias"Cast*	
+to 
+€
+body.16.relu1
+fp32.body.16.c2.weight
+fp32.body.16.c2.biasbody.16.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.15.relu2
+body.16.c2.outputbody.16.sum"Add
+"
+body.16.sumbody.16.relu2"Relu
+C
+stored.body.17.c1.weightfp32.body.17.c1.weight"Cast*	
+to 
+?
+stored.body.17.c1.biasfp32.body.17.c1.bias"Cast*	
+to 
+€
+body.16.relu2
+fp32.body.17.c1.weight
+fp32.body.17.c1.biasbody.17.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.17.c1.outputbody.17.relu1"Relu
+C
+stored.body.17.c2.weightfp32.body.17.c2.weight"Cast*	
+to 
+?
+stored.body.17.c2.biasfp32.body.17.c2.bias"Cast*	
+to 
+€
+body.17.relu1
+fp32.body.17.c2.weight
+fp32.body.17.c2.biasbody.17.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.16.relu2
+body.17.c2.outputbody.17.sum"Add
+"
+body.17.sumbody.17.relu2"Relu
+C
+stored.body.18.c1.weightfp32.body.18.c1.weight"Cast*	
+to 
+?
+stored.body.18.c1.biasfp32.body.18.c1.bias"Cast*	
+to 
+€
+body.17.relu2
+fp32.body.18.c1.weight
+fp32.body.18.c1.biasbody.18.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.18.c1.outputbody.18.relu1"Relu
+C
+stored.body.18.c2.weightfp32.body.18.c2.weight"Cast*	
+to 
+?
+stored.body.18.c2.biasfp32.body.18.c2.bias"Cast*	
+to 
+€
+body.18.relu1
+fp32.body.18.c2.weight
+fp32.body.18.c2.biasbody.18.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.17.relu2
+body.18.c2.outputbody.18.sum"Add
+"
+body.18.sumbody.18.relu2"Relu
+C
+stored.body.19.c1.weightfp32.body.19.c1.weight"Cast*	
+to 
+?
+stored.body.19.c1.biasfp32.body.19.c1.bias"Cast*	
+to 
+€
+body.18.relu2
+fp32.body.19.c1.weight
+fp32.body.19.c1.biasbody.19.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.19.c1.outputbody.19.relu1"Relu
+C
+stored.body.19.c2.weightfp32.body.19.c2.weight"Cast*	
+to 
+?
+stored.body.19.c2.biasfp32.body.19.c2.bias"Cast*	
+to 
+€
+body.19.relu1
+fp32.body.19.c2.weight
+fp32.body.19.c2.biasbody.19.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.18.relu2
+body.19.c2.outputbody.19.sum"Add
+"
+body.19.sumbody.19.relu2"Relu
+C
+stored.body.20.c1.weightfp32.body.20.c1.weight"Cast*	
+to 
+?
+stored.body.20.c1.biasfp32.body.20.c1.bias"Cast*	
+to 
+€
+body.19.relu2
+fp32.body.20.c1.weight
+fp32.body.20.c1.biasbody.20.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.20.c1.outputbody.20.relu1"Relu
+C
+stored.body.20.c2.weightfp32.body.20.c2.weight"Cast*	
+to 
+?
+stored.body.20.c2.biasfp32.body.20.c2.bias"Cast*	
+to 
+€
+body.20.relu1
+fp32.body.20.c2.weight
+fp32.body.20.c2.biasbody.20.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.19.relu2
+body.20.c2.outputbody.20.sum"Add
+"
+body.20.sumbody.20.relu2"Relu
+C
+stored.body.21.c1.weightfp32.body.21.c1.weight"Cast*	
+to 
+?
+stored.body.21.c1.biasfp32.body.21.c1.bias"Cast*	
+to 
+€
+body.20.relu2
+fp32.body.21.c1.weight
+fp32.body.21.c1.biasbody.21.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.21.c1.outputbody.21.relu1"Relu
+C
+stored.body.21.c2.weightfp32.body.21.c2.weight"Cast*	
+to 
+?
+stored.body.21.c2.biasfp32.body.21.c2.bias"Cast*	
+to 
+€
+body.21.relu1
+fp32.body.21.c2.weight
+fp32.body.21.c2.biasbody.21.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.20.relu2
+body.21.c2.outputbody.21.sum"Add
+"
+body.21.sumbody.21.relu2"Relu
+C
+stored.body.22.c1.weightfp32.body.22.c1.weight"Cast*	
+to 
+?
+stored.body.22.c1.biasfp32.body.22.c1.bias"Cast*	
+to 
+€
+body.21.relu2
+fp32.body.22.c1.weight
+fp32.body.22.c1.biasbody.22.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.22.c1.outputbody.22.relu1"Relu
+C
+stored.body.22.c2.weightfp32.body.22.c2.weight"Cast*	
+to 
+?
+stored.body.22.c2.biasfp32.body.22.c2.bias"Cast*	
+to 
+€
+body.22.relu1
+fp32.body.22.c2.weight
+fp32.body.22.c2.biasbody.22.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.21.relu2
+body.22.c2.outputbody.22.sum"Add
+"
+body.22.sumbody.22.relu2"Relu
+C
+stored.body.23.c1.weightfp32.body.23.c1.weight"Cast*	
+to 
+?
+stored.body.23.c1.biasfp32.body.23.c1.bias"Cast*	
+to 
+€
+body.22.relu2
+fp32.body.23.c1.weight
+fp32.body.23.c1.biasbody.23.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.23.c1.outputbody.23.relu1"Relu
+C
+stored.body.23.c2.weightfp32.body.23.c2.weight"Cast*	
+to 
+?
+stored.body.23.c2.biasfp32.body.23.c2.bias"Cast*	
+to 
+€
+body.23.relu1
+fp32.body.23.c2.weight
+fp32.body.23.c2.biasbody.23.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.22.relu2
+body.23.c2.outputbody.23.sum"Add
+"
+body.23.sumbody.23.relu2"Relu
+C
+stored.body.24.c1.weightfp32.body.24.c1.weight"Cast*	
+to 
+?
+stored.body.24.c1.biasfp32.body.24.c1.bias"Cast*	
+to 
+€
+body.23.relu2
+fp32.body.24.c1.weight
+fp32.body.24.c1.biasbody.24.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.24.c1.outputbody.24.relu1"Relu
+C
+stored.body.24.c2.weightfp32.body.24.c2.weight"Cast*	
+to 
+?
+stored.body.24.c2.biasfp32.body.24.c2.bias"Cast*	
+to 
+€
+body.24.relu1
+fp32.body.24.c2.weight
+fp32.body.24.c2.biasbody.24.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.23.relu2
+body.24.c2.outputbody.24.sum"Add
+"
+body.24.sumbody.24.relu2"Relu
+C
+stored.body.25.c1.weightfp32.body.25.c1.weight"Cast*	
+to 
+?
+stored.body.25.c1.biasfp32.body.25.c1.bias"Cast*	
+to 
+€
+body.24.relu2
+fp32.body.25.c1.weight
+fp32.body.25.c1.biasbody.25.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.25.c1.outputbody.25.relu1"Relu
+C
+stored.body.25.c2.weightfp32.body.25.c2.weight"Cast*	
+to 
+?
+stored.body.25.c2.biasfp32.body.25.c2.bias"Cast*	
+to 
+€
+body.25.relu1
+fp32.body.25.c2.weight
+fp32.body.25.c2.biasbody.25.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.24.relu2
+body.25.c2.outputbody.25.sum"Add
+"
+body.25.sumbody.25.relu2"Relu
+C
+stored.body.26.c1.weightfp32.body.26.c1.weight"Cast*	
+to 
+?
+stored.body.26.c1.biasfp32.body.26.c1.bias"Cast*	
+to 
+€
+body.25.relu2
+fp32.body.26.c1.weight
+fp32.body.26.c1.biasbody.26.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.26.c1.outputbody.26.relu1"Relu
+C
+stored.body.26.c2.weightfp32.body.26.c2.weight"Cast*	
+to 
+?
+stored.body.26.c2.biasfp32.body.26.c2.bias"Cast*	
+to 
+€
+body.26.relu1
+fp32.body.26.c2.weight
+fp32.body.26.c2.biasbody.26.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.25.relu2
+body.26.c2.outputbody.26.sum"Add
+"
+body.26.sumbody.26.relu2"Relu
+C
+stored.body.27.c1.weightfp32.body.27.c1.weight"Cast*	
+to 
+?
+stored.body.27.c1.biasfp32.body.27.c1.bias"Cast*	
+to 
+€
+body.26.relu2
+fp32.body.27.c1.weight
+fp32.body.27.c1.biasbody.27.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.27.c1.outputbody.27.relu1"Relu
+C
+stored.body.27.c2.weightfp32.body.27.c2.weight"Cast*	
+to 
+?
+stored.body.27.c2.biasfp32.body.27.c2.bias"Cast*	
+to 
+€
+body.27.relu1
+fp32.body.27.c2.weight
+fp32.body.27.c2.biasbody.27.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.26.relu2
+body.27.c2.outputbody.27.sum"Add
+"
+body.27.sumbody.27.relu2"Relu
+C
+stored.body.28.c1.weightfp32.body.28.c1.weight"Cast*	
+to 
+?
+stored.body.28.c1.biasfp32.body.28.c1.bias"Cast*	
+to 
+€
+body.27.relu2
+fp32.body.28.c1.weight
+fp32.body.28.c1.biasbody.28.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.28.c1.outputbody.28.relu1"Relu
+C
+stored.body.28.c2.weightfp32.body.28.c2.weight"Cast*	
+to 
+?
+stored.body.28.c2.biasfp32.body.28.c2.bias"Cast*	
+to 
+€
+body.28.relu1
+fp32.body.28.c2.weight
+fp32.body.28.c2.biasbody.28.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.27.relu2
+body.28.c2.outputbody.28.sum"Add
+"
+body.28.sumbody.28.relu2"Relu
+C
+stored.body.29.c1.weightfp32.body.29.c1.weight"Cast*	
+to 
+?
+stored.body.29.c1.biasfp32.body.29.c1.bias"Cast*	
+to 
+€
+body.28.relu2
+fp32.body.29.c1.weight
+fp32.body.29.c1.biasbody.29.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.29.c1.outputbody.29.relu1"Relu
+C
+stored.body.29.c2.weightfp32.body.29.c2.weight"Cast*	
+to 
+?
+stored.body.29.c2.biasfp32.body.29.c2.bias"Cast*	
+to 
+€
+body.29.relu1
+fp32.body.29.c2.weight
+fp32.body.29.c2.biasbody.29.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.28.relu2
+body.29.c2.outputbody.29.sum"Add
+"
+body.29.sumbody.29.relu2"Relu
+C
+stored.body.30.c1.weightfp32.body.30.c1.weight"Cast*	
+to 
+?
+stored.body.30.c1.biasfp32.body.30.c1.bias"Cast*	
+to 
+€
+body.29.relu2
+fp32.body.30.c1.weight
+fp32.body.30.c1.biasbody.30.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.30.c1.outputbody.30.relu1"Relu
+C
+stored.body.30.c2.weightfp32.body.30.c2.weight"Cast*	
+to 
+?
+stored.body.30.c2.biasfp32.body.30.c2.bias"Cast*	
+to 
+€
+body.30.relu1
+fp32.body.30.c2.weight
+fp32.body.30.c2.biasbody.30.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.29.relu2
+body.30.c2.outputbody.30.sum"Add
+"
+body.30.sumbody.30.relu2"Relu
+C
+stored.body.31.c1.weightfp32.body.31.c1.weight"Cast*	
+to 
+?
+stored.body.31.c1.biasfp32.body.31.c1.bias"Cast*	
+to 
+€
+body.30.relu2
+fp32.body.31.c1.weight
+fp32.body.31.c1.biasbody.31.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.31.c1.outputbody.31.relu1"Relu
+C
+stored.body.31.c2.weightfp32.body.31.c2.weight"Cast*	
+to 
+?
+stored.body.31.c2.biasfp32.body.31.c2.bias"Cast*	
+to 
+€
+body.31.relu1
+fp32.body.31.c2.weight
+fp32.body.31.c2.biasbody.31.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.30.relu2
+body.31.c2.outputbody.31.sum"Add
+"
+body.31.sumbody.31.relu2"Relu
+C
+stored.body.32.c1.weightfp32.body.32.c1.weight"Cast*	
+to 
+?
+stored.body.32.c1.biasfp32.body.32.c1.bias"Cast*	
+to 
+€
+body.31.relu2
+fp32.body.32.c1.weight
+fp32.body.32.c1.biasbody.32.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.32.c1.outputbody.32.relu1"Relu
+C
+stored.body.32.c2.weightfp32.body.32.c2.weight"Cast*	
+to 
+?
+stored.body.32.c2.biasfp32.body.32.c2.bias"Cast*	
+to 
+€
+body.32.relu1
+fp32.body.32.c2.weight
+fp32.body.32.c2.biasbody.32.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.31.relu2
+body.32.c2.outputbody.32.sum"Add
+"
+body.32.sumbody.32.relu2"Relu
+C
+stored.body.33.c1.weightfp32.body.33.c1.weight"Cast*	
+to 
+?
+stored.body.33.c1.biasfp32.body.33.c1.bias"Cast*	
+to 
+€
+body.32.relu2
+fp32.body.33.c1.weight
+fp32.body.33.c1.biasbody.33.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.33.c1.outputbody.33.relu1"Relu
+C
+stored.body.33.c2.weightfp32.body.33.c2.weight"Cast*	
+to 
+?
+stored.body.33.c2.biasfp32.body.33.c2.bias"Cast*	
+to 
+€
+body.33.relu1
+fp32.body.33.c2.weight
+fp32.body.33.c2.biasbody.33.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.32.relu2
+body.33.c2.outputbody.33.sum"Add
+"
+body.33.sumbody.33.relu2"Relu
+C
+stored.body.34.c1.weightfp32.body.34.c1.weight"Cast*	
+to 
+?
+stored.body.34.c1.biasfp32.body.34.c1.bias"Cast*	
+to 
+€
+body.33.relu2
+fp32.body.34.c1.weight
+fp32.body.34.c1.biasbody.34.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.34.c1.outputbody.34.relu1"Relu
+C
+stored.body.34.c2.weightfp32.body.34.c2.weight"Cast*	
+to 
+?
+stored.body.34.c2.biasfp32.body.34.c2.bias"Cast*	
+to 
+€
+body.34.relu1
+fp32.body.34.c2.weight
+fp32.body.34.c2.biasbody.34.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.33.relu2
+body.34.c2.outputbody.34.sum"Add
+"
+body.34.sumbody.34.relu2"Relu
+C
+stored.body.35.c1.weightfp32.body.35.c1.weight"Cast*	
+to 
+?
+stored.body.35.c1.biasfp32.body.35.c1.bias"Cast*	
+to 
+€
+body.34.relu2
+fp32.body.35.c1.weight
+fp32.body.35.c1.biasbody.35.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.35.c1.outputbody.35.relu1"Relu
+C
+stored.body.35.c2.weightfp32.body.35.c2.weight"Cast*	
+to 
+?
+stored.body.35.c2.biasfp32.body.35.c2.bias"Cast*	
+to 
+€
+body.35.relu1
+fp32.body.35.c2.weight
+fp32.body.35.c2.biasbody.35.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.34.relu2
+body.35.c2.outputbody.35.sum"Add
+"
+body.35.sumbody.35.relu2"Relu
+C
+stored.body.36.c1.weightfp32.body.36.c1.weight"Cast*	
+to 
+?
+stored.body.36.c1.biasfp32.body.36.c1.bias"Cast*	
+to 
+€
+body.35.relu2
+fp32.body.36.c1.weight
+fp32.body.36.c1.biasbody.36.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.36.c1.outputbody.36.relu1"Relu
+C
+stored.body.36.c2.weightfp32.body.36.c2.weight"Cast*	
+to 
+?
+stored.body.36.c2.biasfp32.body.36.c2.bias"Cast*	
+to 
+€
+body.36.relu1
+fp32.body.36.c2.weight
+fp32.body.36.c2.biasbody.36.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.35.relu2
+body.36.c2.outputbody.36.sum"Add
+"
+body.36.sumbody.36.relu2"Relu
+C
+stored.body.37.c1.weightfp32.body.37.c1.weight"Cast*	
+to 
+?
+stored.body.37.c1.biasfp32.body.37.c1.bias"Cast*	
+to 
+€
+body.36.relu2
+fp32.body.37.c1.weight
+fp32.body.37.c1.biasbody.37.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.37.c1.outputbody.37.relu1"Relu
+C
+stored.body.37.c2.weightfp32.body.37.c2.weight"Cast*	
+to 
+?
+stored.body.37.c2.biasfp32.body.37.c2.bias"Cast*	
+to 
+€
+body.37.relu1
+fp32.body.37.c2.weight
+fp32.body.37.c2.biasbody.37.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.36.relu2
+body.37.c2.outputbody.37.sum"Add
+"
+body.37.sumbody.37.relu2"Relu
+C
+stored.body.38.c1.weightfp32.body.38.c1.weight"Cast*	
+to 
+?
+stored.body.38.c1.biasfp32.body.38.c1.bias"Cast*	
+to 
+€
+body.37.relu2
+fp32.body.38.c1.weight
+fp32.body.38.c1.biasbody.38.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.38.c1.outputbody.38.relu1"Relu
+C
+stored.body.38.c2.weightfp32.body.38.c2.weight"Cast*	
+to 
+?
+stored.body.38.c2.biasfp32.body.38.c2.bias"Cast*	
+to 
+€
+body.38.relu1
+fp32.body.38.c2.weight
+fp32.body.38.c2.biasbody.38.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.37.relu2
+body.38.c2.outputbody.38.sum"Add
+"
+body.38.sumbody.38.relu2"Relu
+C
+stored.body.39.c1.weightfp32.body.39.c1.weight"Cast*	
+to 
+?
+stored.body.39.c1.biasfp32.body.39.c1.bias"Cast*	
+to 
+€
+body.38.relu2
+fp32.body.39.c1.weight
+fp32.body.39.c1.biasbody.39.c1.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+(
+body.39.c1.outputbody.39.relu1"Relu
+C
+stored.body.39.c2.weightfp32.body.39.c2.weight"Cast*	
+to 
+?
+stored.body.39.c2.biasfp32.body.39.c2.bias"Cast*	
+to 
+€
+body.39.relu1
+fp32.body.39.c2.weight
+fp32.body.39.c2.biasbody.39.c2.output"Conv*
+kernel_shape@@ *
+pads@@@@ 
+4
+body.38.relu2
+body.39.c2.outputbody.39.sum"Add
+"
+body.39.sumbody.39.relu2"Relu
+.
+body.39.relu2flatten"Flatten*
+axis 
+;
+stored.foot.1.weightfp32.foot.1.weight"Cast*	
+to 
+7
+stored.foot.1.biasfp32.foot.1.bias"Cast*	
+to 
+Q
+flatten
+fp32.foot.1.weight
+fp32.foot.1.biasfoot.hidden"Gemm*
+transB 
+
+foot.hidden	foot.relu"Relu
+;
+stored.foot.3.weightfp32.foot.3.weight"Cast*	
+to 
+7
+stored.foot.3.biasfp32.foot.3.bias"Cast*	
+to 
+R
+	foot.relu
+fp32.foot.3.weight
+fp32.foot.3.bias
+raw_logits"Gemm*
+transB 
+
+mask
+zerolegal"Greater
+1
+legal
+
+raw_logits
+illegal_logitlogits"Wheremcr-kdens-s0-fp16-storage*e€&
+Bstored.stem.weightj$
+locationmcr-kdens-s0-weights.binj
+offset0j
+length87552p*_€
+Bstored.stem.biasj$
+locationmcr-kdens-s0-weights.binj
+offset87552j
+length256p*p€€
+Bstored.body.0.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset87808j
+length294912p*e€
+Bstored.body.0.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset382720j
+length256p*q€€
+Bstored.body.0.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset382976j
+length294912p*e€
+Bstored.body.0.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset677888j
+length256p*q€€
+Bstored.body.1.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset678144j
+length294912p*e€
+Bstored.body.1.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset973056j
+length256p*q€€
+Bstored.body.1.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset973312j
+length294912p*f€
+Bstored.body.1.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset1268224j
+length256p*r€€
+Bstored.body.2.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset1268480j
+length294912p*f€
+Bstored.body.2.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset1563392j
+length256p*r€€
+Bstored.body.2.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset1563648j
+length294912p*f€
+Bstored.body.2.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset1858560j
+length256p*r€€
+Bstored.body.3.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset1858816j
+length294912p*f€
+Bstored.body.3.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset2153728j
+length256p*r€€
+Bstored.body.3.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset2153984j
+length294912p*f€
+Bstored.body.3.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset2448896j
+length256p*r€€
+Bstored.body.4.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset2449152j
+length294912p*f€
+Bstored.body.4.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset2744064j
+length256p*r€€
+Bstored.body.4.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset2744320j
+length294912p*f€
+Bstored.body.4.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset3039232j
+length256p*r€€
+Bstored.body.5.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset3039488j
+length294912p*f€
+Bstored.body.5.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset3334400j
+length256p*r€€
+Bstored.body.5.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset3334656j
+length294912p*f€
+Bstored.body.5.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset3629568j
+length256p*r€€
+Bstored.body.6.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset3629824j
+length294912p*f€
+Bstored.body.6.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset3924736j
+length256p*r€€
+Bstored.body.6.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset3924992j
+length294912p*f€
+Bstored.body.6.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset4219904j
+length256p*r€€
+Bstored.body.7.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset4220160j
+length294912p*f€
+Bstored.body.7.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset4515072j
+length256p*r€€
+Bstored.body.7.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset4515328j
+length294912p*f€
+Bstored.body.7.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset4810240j
+length256p*r€€
+Bstored.body.8.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset4810496j
+length294912p*f€
+Bstored.body.8.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset5105408j
+length256p*r€€
+Bstored.body.8.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset5105664j
+length294912p*f€
+Bstored.body.8.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset5400576j
+length256p*r€€
+Bstored.body.9.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset5400832j
+length294912p*f€
+Bstored.body.9.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset5695744j
+length256p*r€€
+Bstored.body.9.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset5696000j
+length294912p*f€
+Bstored.body.9.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset5990912j
+length256p*s€€
+Bstored.body.10.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset5991168j
+length294912p*g€
+Bstored.body.10.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset6286080j
+length256p*s€€
+Bstored.body.10.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset6286336j
+length294912p*g€
+Bstored.body.10.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset6581248j
+length256p*s€€
+Bstored.body.11.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset6581504j
+length294912p*g€
+Bstored.body.11.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset6876416j
+length256p*s€€
+Bstored.body.11.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset6876672j
+length294912p*g€
+Bstored.body.11.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset7171584j
+length256p*s€€
+Bstored.body.12.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset7171840j
+length294912p*g€
+Bstored.body.12.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset7466752j
+length256p*s€€
+Bstored.body.12.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset7467008j
+length294912p*g€
+Bstored.body.12.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset7761920j
+length256p*s€€
+Bstored.body.13.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset7762176j
+length294912p*g€
+Bstored.body.13.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset8057088j
+length256p*s€€
+Bstored.body.13.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset8057344j
+length294912p*g€
+Bstored.body.13.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset8352256j
+length256p*s€€
+Bstored.body.14.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset8352512j
+length294912p*g€
+Bstored.body.14.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset8647424j
+length256p*s€€
+Bstored.body.14.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset8647680j
+length294912p*g€
+Bstored.body.14.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset8942592j
+length256p*s€€
+Bstored.body.15.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset8942848j
+length294912p*g€
+Bstored.body.15.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset9237760j
+length256p*s€€
+Bstored.body.15.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset9238016j
+length294912p*g€
+Bstored.body.15.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset9532928j
+length256p*s€€
+Bstored.body.16.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset9533184j
+length294912p*g€
+Bstored.body.16.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset9828096j
+length256p*s€€
+Bstored.body.16.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset9828352j
+length294912p*h€
+Bstored.body.16.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset10123264j
+length256p*t€€
+Bstored.body.17.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset10123520j
+length294912p*h€
+Bstored.body.17.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset10418432j
+length256p*t€€
+Bstored.body.17.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset10418688j
+length294912p*h€
+Bstored.body.17.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset10713600j
+length256p*t€€
+Bstored.body.18.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset10713856j
+length294912p*h€
+Bstored.body.18.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset11008768j
+length256p*t€€
+Bstored.body.18.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset11009024j
+length294912p*h€
+Bstored.body.18.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset11303936j
+length256p*t€€
+Bstored.body.19.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset11304192j
+length294912p*h€
+Bstored.body.19.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset11599104j
+length256p*t€€
+Bstored.body.19.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset11599360j
+length294912p*h€
+Bstored.body.19.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset11894272j
+length256p*t€€
+Bstored.body.20.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset11894528j
+length294912p*h€
+Bstored.body.20.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset12189440j
+length256p*t€€
+Bstored.body.20.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset12189696j
+length294912p*h€
+Bstored.body.20.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset12484608j
+length256p*t€€
+Bstored.body.21.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset12484864j
+length294912p*h€
+Bstored.body.21.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset12779776j
+length256p*t€€
+Bstored.body.21.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset12780032j
+length294912p*h€
+Bstored.body.21.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset13074944j
+length256p*t€€
+Bstored.body.22.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset13075200j
+length294912p*h€
+Bstored.body.22.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset13370112j
+length256p*t€€
+Bstored.body.22.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset13370368j
+length294912p*h€
+Bstored.body.22.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset13665280j
+length256p*t€€
+Bstored.body.23.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset13665536j
+length294912p*h€
+Bstored.body.23.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset13960448j
+length256p*t€€
+Bstored.body.23.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset13960704j
+length294912p*h€
+Bstored.body.23.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset14255616j
+length256p*t€€
+Bstored.body.24.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset14255872j
+length294912p*h€
+Bstored.body.24.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset14550784j
+length256p*t€€
+Bstored.body.24.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset14551040j
+length294912p*h€
+Bstored.body.24.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset14845952j
+length256p*t€€
+Bstored.body.25.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset14846208j
+length294912p*h€
+Bstored.body.25.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset15141120j
+length256p*t€€
+Bstored.body.25.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset15141376j
+length294912p*h€
+Bstored.body.25.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset15436288j
+length256p*t€€
+Bstored.body.26.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset15436544j
+length294912p*h€
+Bstored.body.26.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset15731456j
+length256p*t€€
+Bstored.body.26.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset15731712j
+length294912p*h€
+Bstored.body.26.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset16026624j
+length256p*t€€
+Bstored.body.27.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset16026880j
+length294912p*h€
+Bstored.body.27.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset16321792j
+length256p*t€€
+Bstored.body.27.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset16322048j
+length294912p*h€
+Bstored.body.27.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset16616960j
+length256p*t€€
+Bstored.body.28.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset16617216j
+length294912p*h€
+Bstored.body.28.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset16912128j
+length256p*t€€
+Bstored.body.28.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset16912384j
+length294912p*h€
+Bstored.body.28.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset17207296j
+length256p*t€€
+Bstored.body.29.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset17207552j
+length294912p*h€
+Bstored.body.29.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset17502464j
+length256p*t€€
+Bstored.body.29.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset17502720j
+length294912p*h€
+Bstored.body.29.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset17797632j
+length256p*t€€
+Bstored.body.30.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset17797888j
+length294912p*h€
+Bstored.body.30.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset18092800j
+length256p*t€€
+Bstored.body.30.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset18093056j
+length294912p*h€
+Bstored.body.30.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset18387968j
+length256p*t€€
+Bstored.body.31.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset18388224j
+length294912p*h€
+Bstored.body.31.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset18683136j
+length256p*t€€
+Bstored.body.31.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset18683392j
+length294912p*h€
+Bstored.body.31.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset18978304j
+length256p*t€€
+Bstored.body.32.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset18978560j
+length294912p*h€
+Bstored.body.32.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset19273472j
+length256p*t€€
+Bstored.body.32.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset19273728j
+length294912p*h€
+Bstored.body.32.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset19568640j
+length256p*t€€
+Bstored.body.33.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset19568896j
+length294912p*h€
+Bstored.body.33.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset19863808j
+length256p*t€€
+Bstored.body.33.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset19864064j
+length294912p*h€
+Bstored.body.33.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset20158976j
+length256p*t€€
+Bstored.body.34.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset20159232j
+length294912p*h€
+Bstored.body.34.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset20454144j
+length256p*t€€
+Bstored.body.34.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset20454400j
+length294912p*h€
+Bstored.body.34.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset20749312j
+length256p*t€€
+Bstored.body.35.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset20749568j
+length294912p*h€
+Bstored.body.35.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset21044480j
+length256p*t€€
+Bstored.body.35.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset21044736j
+length294912p*h€
+Bstored.body.35.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset21339648j
+length256p*t€€
+Bstored.body.36.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset21339904j
+length294912p*h€
+Bstored.body.36.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset21634816j
+length256p*t€€
+Bstored.body.36.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset21635072j
+length294912p*h€
+Bstored.body.36.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset21929984j
+length256p*t€€
+Bstored.body.37.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset21930240j
+length294912p*h€
+Bstored.body.37.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset22225152j
+length256p*t€€
+Bstored.body.37.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset22225408j
+length294912p*h€
+Bstored.body.37.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset22520320j
+length256p*t€€
+Bstored.body.38.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset22520576j
+length294912p*h€
+Bstored.body.38.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset22815488j
+length256p*t€€
+Bstored.body.38.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset22815744j
+length294912p*h€
+Bstored.body.38.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset23110656j
+length256p*t€€
+Bstored.body.39.c1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset23110912j
+length294912p*h€
+Bstored.body.39.c1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset23405824j
+length256p*t€€
+Bstored.body.39.c2.weightj$
+locationmcr-kdens-s0-weights.binj
+offset23406080j
+length294912p*h€
+Bstored.body.39.c2.biasj$
+locationmcr-kdens-s0-weights.binj
+offset23700992j
+length256p*m€€$
+Bstored.foot.1.weightj$
+locationmcr-kdens-s0-weights.binj
+offset23701248j
+length4718592p*e€
+Bstored.foot.1.biasj$
+locationmcr-kdens-s0-weights.binj
+offset28419840j
+length1024p*lë€
+Bstored.foot.3.weightj$
+locationmcr-kdens-s0-weights.binj
+offset28420864j
+length240640p*dë
+Bstored.foot.3.biasj$
+locationmcr-kdens-s0-weights.binj
+offset28661504j
+length470p*BzeroJ    *Billegal_logitJ(knÎZ%
+observation
+
+
+&
+
+	Z
+mask
+	
+
+ëb
+logits
+	
+
+ëB
+ 

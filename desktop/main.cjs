@@ -7,7 +7,7 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'jakukyo', privileges: { standar
 app.setName('雀境');
 app.setPath('userData', path.join(app.getPath('appData'), 'Jakukyo'));
 
-const contentPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-src 'none'";
+const contentPolicy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-src 'none'";
 
 async function openWindow() {
   const window = new BrowserWindow({

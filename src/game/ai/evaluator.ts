@@ -100,7 +100,7 @@ export function evaluateDanger(observation: BotObservation, tile: string, known 
         else if (unblocked < possibleShapes.length) danger *= .65;
       }
       // Public flush signals: two or more open melds in one suit, with no other suited melds.
-      const suitedMelds = opponent.melds.filter(meld => meld[0] !== 'z');
+      const suitedMelds = opponent.melds.filter(meld => /^[mps]/.test(meld));
       if (suitedMelds.length >= 2 && suitedMelds.every(meld => meld[0] === suitedMelds[0][0])) {
         danger *= suit === suitedMelds[0][0] ? 1.6 : .32;
       }

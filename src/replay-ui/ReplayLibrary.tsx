@@ -73,6 +73,7 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
   }, [frames]);
   const snapshot = useMemo<GameSnapshot | null>(() => frame ? {
     ...frame.snapshot, actions: [], autoPlay: false, latestWin: undefined,
+    hideOpponentConcealedKongs: showHands && frame.allHands ? false : frame.snapshot.hideOpponentConcealedKongs,
     players: frame.snapshot.players.map(player => ({ ...player, revealedHand: showHands && frame.allHands ? frame.allHands[player.id] : undefined })),
   } : null, [frame, showHands]);
   const playerNames = snapshot?.players.map(player => player.name) ?? [];

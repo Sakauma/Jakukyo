@@ -39,14 +39,16 @@ export interface PlayerRiverMatches {
 }
 
 /** Public rivers and face-up meld tiles only; never inspect concealed hands. */
-export function getRiverMatches(players: readonly (Pick<PlayerView, 'id' | 'discards'> & Partial<Pick<PlayerView, 'melds'>>)[], highlightedTile: string | null | undefined) {
+export function getRiverMatches(players: readonly (Pick<PlayerView, 'id' | 'discards'> & Partial<Pick<PlayerView, 'melds'>>)[], highlightedTile: string | null | undefined,
+  visibility?: Pick<GameSnapshot, 'humanId' | 'hideOpponentConcealedKongs'>) {
   const tile = normalizeRiverTile(highlightedTile);
   const byPlayer: PlayerRiverMatches[] = players.map(player => {
     const discardedIndices = tile ? player.discards.flatMap((discard, index) => normalizeRiverTile(discard.tile) === tile ? [index] : []) : [];
     const inRiverIndices = discardedIndices.filter(index => !player.discards[index].called);
     const currentPage = new Set(riverLayout(player.discards).items.map(discard => discard.sourceIndex));
     const pageIndices = inRiverIndices.filter(index => currentPage.has(index));
-    const meldIndices = tile ? seatLayout([], player.melds ?? [], false).melds.flatMap(item =>
+    const hideConcealed = !!visibility?.hideOpponentConcealedKongs && player.id !== visibility.humanId;
+    const meldIndices = tile ? seatLayout([], player.melds ?? [], false, false, hideConcealed).melds.flatMap(item =>
       item.tile && normalizeRiverTile(item.tile) === tile ? [{ meldIndex: item.meldIndex, tileIndex: item.tileIndex }] : []) : [];
     return { playerId: player.id, inRiverCount: inRiverIndices.length, pageCount: pageIndices.length, inMeldCount: meldIndices.length,
       discardedCount: discardedIndices.length, calledAwayCount: discardedIndices.length - inRiverIndices.length,

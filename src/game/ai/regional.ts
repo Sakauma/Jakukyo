@@ -7,6 +7,9 @@ import { normalizeSichuanOptions } from '../variants/sichuan';
 import { evaluateDanger, rankPublicCandidates, samplePublicDraws, tileIndex, visibleCounts } from './evaluator';
 import { safeOpenYaku } from './riichi';
 import type { BotDecision, BotObservation, Difficulty, GenericCandidate } from './types';
+import Majiang from '@kobalab/majiang-core';
+import { regionalAwardValue, regionalPublicObservation, rankRegionalCandidates } from './regionalEvaluation';
+import type { RegionalCandidate } from './regionalEvaluation';
 
 export interface RegionalBotAction {
   key: string;
@@ -21,6 +24,7 @@ export interface RegionalBotAction {
 
 /** Every field is this player's own state, a legal action, or public table data. */
 export interface RegionalBotInput {
+  aiVersion?: number;
   observation: BotObservation;
   player: ScoringPlayer;
   profile: RuleProfile;
@@ -30,6 +34,9 @@ export interface RegionalBotInput {
   wildcard?: string;
   sichuan?: SichuanOptions;
   rulesVersion?: 1 | 2;
+  furiten?: { temporary: boolean; permanent: boolean };
+  modelFeatures?: Float32Array;
+  focusKeys?: string[];
 }
 
 const DECISION_BUDGET: Record<Difficulty, number> = {
@@ -247,6 +254,10 @@ function fallbackDecision(input: RegionalBotInput): BotDecision {
 }
 
 export function chooseRegionalAction(input: RegionalBotInput): BotDecision {
+  if ((input.aiVersion ?? 6) >= 7) {
+    try { return evaluateRegionalV7(input); }
+    catch { return { ...fallbackDecision(input), provider: 'algorithm' }; }
+  }
   try { return evaluateRegionalAction(input); }
   catch { return fallbackDecision(input); }
 }
@@ -509,6 +520,167 @@ function evaluateRegionalAction(input: RegionalBotInput): BotDecision {
   }
   const result = resultFor(candidates);
   return { ...result, strategy: result.key === pass?.key ? 'pass' : 'call' };
+}
+
+function evaluateRegionalV7(input: RegionalBotInput): BotDecision {
+  if (!input.actions.length) throw new Error('AI cannot decide without legal actions.');
+  const win = input.actions.find(action => action.type === 'ron' || action.type === 'tsumo');
+  if (win) return { key: win.key, difficulty: input.difficulty, strategy: 'win', candidates: [], searchNodes: 0, searchBudget: 0, provider: 'algorithm' };
+  const observation = regionalPublicObservation({ ...input, observation: withPublicLossValues(input) });
+  input = { ...input, observation };
+  const known = visibleCounts(observation);
+  const universe = (observation.tileLimits || Array<number>(34).fill(4))
+    .flatMap((limit, index) => limit ? ['mpsz'[Math.floor(index / 9)] + (index % 9 + 1)] : []);
+  interface State { action: RegionalBotAction; hand: string[]; melds: MeldView[]; player: ScoringPlayer; discard?: string; immediateGain: number }
+  const states: State[] = [];
+  const add = (action: RegionalBotAction, hand: string[], melds: MeldView[], discard?: string, kita = input.player.kita) => {
+    const player = { ...copyPlayer(input.player, hand, melds), kita,
+      riichi: input.player.riichi || action.type === 'riichi' };
+    const payers = Math.max(1, (observation.activePlayerCount ?? observation.playerCount) - 1);
+    const immediateGain = input.profile.id.startsWith('sichuan') && action.type === 'kan'
+      ? action.kind === 'open' ? 2 : action.kind === 'concealed' ? payers * 2 : payers : 0;
+    states.push({ action, hand, melds, player, discard, immediateGain });
+  };
+  for (const action of input.actions) {
+    if (action.type === 'discard' || action.type === 'riichi') {
+      if (action.index != null) add(action, input.player.hand.filter((_, index) => index !== action.index), input.player.melds, action.tile);
+    } else if (action.type === 'pass') add(action, [...input.player.hand], input.player.melds);
+    else if (action.type === 'kita') {
+      const hand = [...input.player.hand], north = hand.indexOf('z4');
+      if (north >= 0) { hand.splice(north, 1); add(action, hand, input.player.melds, undefined, input.player.kita + 1); }
+    } else if (['chi', 'pon', 'kan'].includes(action.type)) {
+      const after = afterCall(input.player, action);
+      if (!after) continue;
+      if (action.type === 'kan') add(action, after.hand, after.melds);
+      else for (const index of legalDiscardIndices(input.player, after.hand)) {
+        add(action, after.hand.filter((_, at) => at !== index), after.melds, after.hand[index]);
+      }
+    }
+  }
+  const distinct = new Map<string, State>();
+  for (const state of states) {
+    const action = state.action;
+    const signature = [action.type, action.kind, state.hand.slice().sort().join(''), JSON.stringify(state.melds), state.discard,
+      state.player.riichi, state.player.kita].join('|');
+    const previous = distinct.get(signature);
+    if (!previous || action.key.localeCompare(previous.action.key) < 0) distinct.set(signature, state);
+  }
+  const choices = [...distinct.values()].sort((a, b) => a.action.key.localeCompare(b.action.key) || (a.discard || '').localeCompare(b.discard || ''));
+  if (!choices.length) return { ...fallbackDecision(input), provider: 'algorithm' };
+  const complex = input.profile.sets > 4 || !!input.wildcard;
+  const limit = Math.max(complex ? 2400 : input.profile.id === 'mcr' ? 2400 : 0, DECISION_BUDGET[input.difficulty]);
+  const focused = new Set(input.focusKeys || []);
+  const focusCount = choices.filter(state => focused.has(state.action.key)).length;
+  const baseBudget = focusCount ? limit / 2 : limit;
+  let used = 0;
+  const metrics: RegionalCandidate[] = choices.map(state => {
+    // Each complete candidate receives its own allowance. Input enumeration never owns the shared remainder.
+    const allowance = Math.floor(baseBudget / choices.length + (focused.has(state.action.key) ? (limit - baseBudget) / focusCount : 0));
+    const budget = new DecisionBudget(allowance);
+    const handBudget = { spend: () => budget.spend(1 / 128) };
+    const distance = (tiles: string[]) => {
+      if (!budget.spend(1)) return undefined;
+      const result = shanten(tiles, state.melds, input.profile.sets, input.wildcard, input.profile.sevenPairs, input.profile.orphans, handBudget);
+      return budget.exhausted ? undefined : result;
+    };
+    const measured = distance(state.hand);
+    // A 3n+1 wildcard hand can return -1 from the structural estimate. It still needs a real winning draw.
+    const structural = Math.max(0, measured ?? shallowDistance(input, state.hand, state.melds));
+    let effectiveDistance = structural;
+    let ukeire = 0, ronUkeire = 0, tsumoUkeire = 0, ronValue = 0, tsumoValue = 0;
+    let estimatedValue = routeValue(input, state.hand, state.melds);
+    const specialWaits = new Set<string>();
+    if (input.profile.id === 'mcr' && state.melds.length <= 1) {
+      const counts = countsOf(state.hand);
+      const unique = state.hand.every(tile => counts[tileIndex(tile)] === 1);
+      for (const pattern of KNITTED_PATTERNS) {
+        if (!state.melds.length && unique && state.hand.every(tile => tile[0] === 'z' || pattern.includes(norm(tile)))) {
+          for (const tile of [...pattern, ...Array.from({ length: 7 }, (_, index) => `z${index + 1}`)]) {
+            if (!counts[tileIndex(tile)]) specialWaits.add(tile);
+          }
+        }
+        const missing = pattern.filter(tile => !counts[tileIndex(tile)]);
+        if (missing.length > 1) continue;
+        const tail = [...state.hand];
+        for (const tile of pattern) {
+          const index = tail.findIndex(owned => norm(owned) === tile);
+          if (index >= 0) tail.splice(index, 1);
+        }
+        for (const tile of missing.length ? missing : universe) {
+          const completed = missing.length ? tail : [...tail, tile];
+          if (decompose(completed, [], 1 - state.melds.length, undefined, false, handBudget).length) specialWaits.add(tile);
+        }
+      }
+    }
+    const specialMcr = specialWaits.size > 0;
+    if (structural === 0 || specialMcr) {
+      let possible = universe;
+      if (!complex) {
+        const hand = coreHand(state.hand, state.melds);
+        possible = Majiang.Util.tingpai(hand, (candidate: any) => Math.min(Majiang.Util.xiangting_yiban(candidate),
+          input.profile.sevenPairs ? Majiang.Util.xiangting_qidui(candidate) : Infinity,
+          input.profile.orphans ? Majiang.Util.xiangting_guoshi(candidate) : Infinity)) || [];
+        possible = [...new Set([...possible, ...specialWaits])].sort();
+      }
+      const owned = countsOf([...state.hand, ...state.melds.flatMap(meld => meld.tiles)]);
+      const waits: string[] = [];
+      for (const tile of possible) {
+        if (owned[tileIndex(tile)] >= (observation.tileLimits?.[tileIndex(tile)] ?? 4)) continue;
+        if (!budget.spend(input.profile.id === 'mcr' ? 4 : 1)) break;
+        const shape = input.profile.id === 'mcr' ? isMcrWinningShape(state.hand, state.melds, tile)
+          : decompose([...state.hand, tile], state.melds, input.profile.sets, input.wildcard, false, handBudget)
+            .some(form => (!form.sevenPairs || input.profile.sevenPairs) && (!form.orphans || input.profile.orphans));
+        if (shape) waits.push(tile);
+        if (budget.exhausted) break;
+      }
+      const ownRiver = observation.players.find(player => player.id === observation.ownId)?.discards || [];
+      const furiten = input.profile.id === 'sanma' && (input.furiten?.temporary || input.furiten?.permanent
+        || waits.some(tile => norm(state.discard || '') === tile || ownRiver.some(discard => norm(discard.tile) === tile)));
+      let ronTotal = 0, tsumoTotal = 0;
+      for (const tile of waits) {
+        const remaining = Math.max(0, (observation.tileLimits?.[tileIndex(tile)] ?? 4) - known[tileIndex(tile)]);
+        if (!remaining) continue;
+        if (!budget.spend(input.profile.id === 'mcr' ? 8 : 2)) break;
+        const ron = furiten ? null : scoreHand(ordinaryContext(input, state.player, tile, false), undefined, handBudget);
+        const tsumoPlayer = { ...state.player, hand: [...state.hand, tile] };
+        const tsumo = scoreHand(ordinaryContext(input, tsumoPlayer, tile, true), undefined, handBudget);
+        if (budget.exhausted) break;
+        const ronAward = ron ? regionalAwardValue(input, ron, false) : 0;
+        const tsumoAward = tsumo ? regionalAwardValue(input, tsumo, true) : 0;
+        if (ronAward || tsumoAward) ukeire += remaining;
+        if (ronAward) { ronUkeire += remaining; ronTotal += ronAward * remaining; }
+        if (tsumoAward) { tsumoUkeire += remaining; tsumoTotal += tsumoAward * remaining; }
+      }
+      if (!budget.exhausted) {
+        ronValue = ronUkeire ? ronTotal / ronUkeire : 0;
+        tsumoValue = tsumoUkeire ? tsumoTotal / tsumoUkeire : 0;
+        estimatedValue = combinedValue(ronValue, tsumoValue);
+        effectiveDistance = ukeire ? 0 : Math.max(1, structural);
+      } else {
+        // No partial wait prefix becomes a complete legal hand or a zero-fan verdict.
+        ukeire = ronUkeire = tsumoUkeire = 0;
+        effectiveDistance = Math.max(1, structural);
+      }
+    } else {
+      let complete = true;
+      for (const tile of universe) {
+        const remaining = Math.max(0, (observation.tileLimits?.[tileIndex(tile)] ?? 4) - known[tileIndex(tile)]);
+        if (!remaining) continue;
+        const next = distance([...state.hand, tile]);
+        if (next === undefined) { complete = false; break; }
+        if (next < structural) ukeire += remaining;
+      }
+      if (!complete) ukeire = 0;
+    }
+    used += budget.used;
+    return { key: state.action.key, tile: state.discard, hand: state.hand, shanten: effectiveDistance, ukeire,
+      estimatedValue, shapeScore: shapeValue(state.hand, state.melds), ronUkeire, tsumoUkeire, ronValue, tsumoValue,
+      riichiDeclaration: state.action.type === 'riichi', immediateGain: state.immediateGain };
+  });
+  const ranked = rankRegionalCandidates(input, metrics);
+  const selected = input.actions.find(action => action.key === ranked.key)!;
+  return { ...ranked, strategy: selected.type === 'pass' ? 'pass' : ['chi', 'pon', 'kan', 'kita'].includes(selected.type) ? 'call' : ranked.strategy,
+    searchNodes: Math.ceil(used), searchBudget: limit };
 }
 
 function legalDiscardIndices(player: ScoringPlayer, hand: string[]): number[] {

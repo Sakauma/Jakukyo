@@ -14,7 +14,7 @@ interface MeldTileLayout {
 }
 
 /** Concealed tiles occupy the left part; whole melds grow left from a fixed right edge. */
-export function seatLayout(hand: readonly Pick<HandTile, 'drawn'>[], melds: readonly MeldView[], human: boolean, largeHand = false) {
+export function seatLayout(hand: readonly Pick<HandTile, 'drawn'>[], melds: readonly MeldView[], human: boolean, largeHand = false, hideConcealedKongs = false) {
   const count = melds.reduce((total, meld) => total + meld.tiles.length, 0);
   const handScale = human ? largeHand ? 1.06 : 1.2 : 1;
   const handSpacing = human ? largeHand ? .61 : .695 : .575;
@@ -35,7 +35,7 @@ export function seatLayout(hand: readonly Pick<HandTile, 'drawn'>[], melds: read
     return meld.tiles.map<MeldTileLayout>((tile, tileIndex) => {
       if (tileIndex) right -= tileGap;
       const x = right - tileWidth / 2; right -= tileWidth;
-      const faceDown = meld.concealed && (tileIndex === 0 || tileIndex === 3);
+      const faceDown = meld.concealed && (hideConcealedKongs || tileIndex === 0 || tileIndex === 3);
       return { key: `${meld.id}-${tileIndex}`, meldIndex, tileIndex, tile: faceDown ? undefined : tile,
         position: [x, 0, HAND_ROW_Z], rotation: [faceDown ? Math.PI / 2 : -Math.PI / 2, 0, 0], scale };
     });

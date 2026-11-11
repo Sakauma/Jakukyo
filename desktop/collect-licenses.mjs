@@ -26,9 +26,33 @@ export async function collectLicenses(root, { electronRuntime = true } = {}) {
   if (!tileSource.trim() || !tileLicense.trim()) {
     throw new Error('Cannot package tile artwork with empty source attribution or license text.');
   }
+  const modelSource = JSON.parse(await readFile(join(root, 'src/game/ai/models/mcr/source.json'), 'utf8'));
+  const riichiSource = JSON.parse(await readFile(join(root, 'src/game/ai/models/riichi/source.json'), 'utf8'));
+  const riichiLicense = await readFile(join(root, 'src/game/ai/models/riichi/LICENSE'), 'utf8');
+  const modelLicense = `MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
   const queue = Object.keys(source.dependencies ?? {}).map(name => ({ name, from: root }));
   const visited = new Set(), sections = [
     `\n${'='.repeat(72)}\nBundled standard mahjong tile artwork\n\nSOURCE.md\n${tileSource}\nLICENSE.md\n${tileLicense}`,
+    `\n${'='.repeat(72)}\nBundled MCR local policy model and feature/action adapter\nPublisher: ${modelSource.publisher}\nDeclared license: ${modelSource.license}\nLicense declaration: ${modelSource.licenseDeclaration}\nPinned source and runtime provenance\n${JSON.stringify(modelSource, null, 2)}\n\n${modelLicense}`,
+    `\n${'='.repeat(72)}\nBundled TanyaoDojo local riichi policy model and public feature adapter\n${JSON.stringify(riichiSource, null, 2)}\n\n${riichiLicense}`,
   ];
   while (queue.length) {
     const item = queue.shift(), pkg = await findPackage(item.name, item.from);

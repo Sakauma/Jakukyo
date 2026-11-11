@@ -4,9 +4,9 @@
   "version": "0.3.4",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b && vite build",
-    "build:offline": "tsc --noEmit && node scripts/offline-build.mjs",
+    "dev": "node scripts/prepare-models.mjs && node scripts/prepare-riichi-model.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/prepare-models.mjs && node scripts/prepare-riichi-model.mjs && tsc -b && vite build",
+    "build:offline": "node scripts/prepare-models.mjs && node scripts/prepare-riichi-model.mjs && tsc --noEmit && node scripts/offline-build.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "package:windows:wsl": "node scripts/package-windows-wsl.mjs"
   },
@@ -14,6 +14,7 @@
     "@kobalab/majiang-core": "^1.3.4",
     "@react-three/fiber": "^9.1.2",
     "gb-mahjong-js": "^2.2.1",
+    "onnxruntime-web": "1.23.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.175.0"
@@ -26,6 +27,7 @@
     "@types/three": "^0.175.0",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "~5.7.3",
+    "undici": "7.30.2",
     "vite": "^6.2.2"
   }
 }

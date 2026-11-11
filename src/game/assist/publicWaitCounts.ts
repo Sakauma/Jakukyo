@@ -27,7 +27,10 @@ export function publicWaitCounts(snapshot: GameSnapshot, waits: readonly string[
   for (const player of snapshot.players) {
     // Called discards already belong to the exposed meld and must be counted once.
     player.discards.filter(discard => !discard.called).forEach(discard => add(discard.tile));
-    player.melds.forEach(meld => meld.tiles.forEach(add));
+    player.melds.forEach(meld => {
+      if (snapshot.hideOpponentConcealedKongs && player.id !== snapshot.humanId && meld.concealed) return;
+      meld.tiles.forEach(add);
+    });
     player.flowers?.forEach(add);
     for (let n = 0; n < (player.kita ?? 0); n++) add('z4');
   }

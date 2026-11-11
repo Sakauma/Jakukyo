@@ -34,7 +34,7 @@ fi
 BUILD_ROOT="$SOURCE_ROOT/.wsl-build"
 mkdir -p "$BUILD_ROOT" "$SOURCE_ROOT/release"
 # Separate Linux node_modules from the Windows development checkout.
-for item in src public desktop docs; do
+for item in src public desktop docs scripts; do
   if test -d "$SOURCE_ROOT/$item"; then
     if test "$BUILD_ROOT" != "$SOURCE_ROOT/.wsl-build"; then exit 1; fi
     rm -rf -- "$BUILD_ROOT/$item"

@@ -1,0 +1,36 @@
+{
+  "id": "mcr-kdens-s0",
+  "publisher": "Dannibal",
+  "repository": "https://huggingface.co/Dannibal/ijcai-mahjong-ckpts-2026",
+  "revision": "6964d80b9f8a6670dda44f14b664c61112f61009",
+  "license": "MIT",
+  "licenseDeclaration": "https://huggingface.co/Dannibal/ijcai-mahjong-ckpts-2026/blob/6964d80b9f8a6670dda44f14b664c61112f61009/README.md",
+  "weights": {
+    "file": "champion/kdens_s0_fp16.npz",
+    "url": "https://huggingface.co/Dannibal/ijcai-mahjong-ckpts-2026/resolve/6964d80b9f8a6670dda44f14b664c61112f61009/champion/kdens_s0_fp16.npz",
+    "bytes": 26564407,
+    "sha256": "b2d8bc289b0822e1d3e9d04eba3b6b3c435cd37a941875fc3af638cf84ef6e82"
+  },
+  "inferenceSource": {
+    "file": "champion/numpy_resfused.py",
+    "url": "https://huggingface.co/Dannibal/ijcai-mahjong-ckpts-2026/resolve/6964d80b9f8a6670dda44f14b664c61112f61009/champion/numpy_resfused.py",
+    "sha256": "bf8f070b7a642b10a4208d412bbf3cf4f2ceb3c185f16c0df2237e0b46df7c04"
+  },
+  "conversion": {
+    "format": "ONNX external data",
+    "storedType": "float16",
+    "computeType": "float32",
+    "opset": 13,
+    "irVersion": 9
+  },
+  "runtime": {
+    "package": "onnxruntime-web",
+    "version": "1.23.2",
+    "license": "MIT",
+    "wasm": {
+      "file": "ort-wasm-simd-threaded.wasm",
+      "bytes": 11905541,
+      "sha256": "45eaee27761ad883742a8d4b8fce1538d60ce43b51adf1726fafccc59b8c1a15"
+    }
+  }
+}

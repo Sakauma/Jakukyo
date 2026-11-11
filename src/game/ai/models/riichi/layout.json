@@ -1,0 +1,1541 @@
+{
+  "format": "pinned-numpy-pickle-byte-slices-float32-v1",
+  "source": {
+    "file": "bc_v2_g186.pkl",
+    "bytes": 25015327,
+    "sha256": "b94b6768f6dbcc0b92a23faa1173b70936fc5db1413312c0488e293c5d86d512"
+  },
+  "weights": {
+    "bytes": 25010176,
+    "sha256": "5c5d831c5ea55f389df2471a9074a8bac658894e59ae5954b6d06a98b351da2c"
+  },
+  "entries": [
+    {
+      "name": "params/Dense_0/kernel",
+      "shape": [
+        32,
+        32
+      ],
+      "bytes": 4096,
+      "offset": 210367,
+      "sha256": "c80f8fa7b3bced2cc02ccddd21153a6d4e4d68b0c9f81ea5e02f480bbc329d11",
+      "targetOffset": 0,
+      "targetBytes": 4096,
+      "targetShape": [
+        32,
+        32
+      ]
+    },
+    {
+      "name": "params/Conv_0/kernel",
+      "shape": [
+        3,
+        68,
+        256
+      ],
+      "bytes": 208896,
+      "offset": 1251,
+      "sha256": "77f11a59f803d0dc8bc29c9604c53131b10ad437df1db04aeccffdb3cfae40ad",
+      "targetOffset": 4096,
+      "targetBytes": 208896,
+      "targetShape": [
+        256,
+        68,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 180,
+      "sha256": "9f6445517719bd4f79bfe132b7b6c718b0f6c7948c735cd57fed0717b8de5366",
+      "targetOffset": 212992,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_0/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 10797511,
+      "sha256": "469190c91206960a7b79b97156f27c69e8f4b0fde057d3e71e36bdb163279953",
+      "targetOffset": 214016,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_0/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 10796451,
+      "sha256": "2004062b020b0aa8048beaabe364efe8aeffdc02375b596d71c0e912dc516520",
+      "targetOffset": 215040,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_0/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 9222401,
+      "sha256": "d4872220c8be92b7ef2a352a4da88ec0e7a9e2d4aa1632f1aa81fb35b1da391f",
+      "targetOffset": 216064,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_0/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 9221336,
+      "sha256": "66172423ca6381b2cc1253ea021f24c0ddd1ae2498a9f4f32ed54b635a9e0b28",
+      "targetOffset": 1002496,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_0/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 10799649,
+      "sha256": "894ea9c871c0ddb3e9a256b197f312ded0f505adee89f8fe7d6baec08ae047e2",
+      "targetOffset": 1003520,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_0/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 10798589,
+      "sha256": "971df22ea86b2b2c453beb62fa61ec802ad65766eccf4917c29410512de70069",
+      "targetOffset": 1004544,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_0/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 10009956,
+      "sha256": "6c89132fcf2f7d5729e5eb11f77dd00636a5ec0351e3c28439ef8ffbde8e1eab",
+      "targetOffset": 1005568,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_0/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 10008891,
+      "sha256": "64aaedabd8947598011e825e825348f7b5d8fb519c4327c026789759f1acb1d5",
+      "targetOffset": 1792000,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_1/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 12376916,
+      "sha256": "0d27860455d38911a8c63cd62a97f2d8a76f0cd6499a6ee75b39449205683882",
+      "targetOffset": 1793024,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_1/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 12375856,
+      "sha256": "96d2e7e3a7303d820b09222c8e2c332a6ccb4242cb00ee21de1aa48b3bb6b4a6",
+      "targetOffset": 1794048,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_1/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 10801806,
+      "sha256": "2b1397c252abe95d4e7d8f15f2b4cd5e193de32ec8a354b313ee77b211e26e2d",
+      "targetOffset": 1795072,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_1/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 10800741,
+      "sha256": "b0c1e0840ead822373a4c88135d32baf7a9cf748ba50a350d59460d0a26e224c",
+      "targetOffset": 2581504,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_1/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 12379054,
+      "sha256": "a2edc3576629e967d92f0d7a33228de8e7842d477fe80238167c24c2bd2e9180",
+      "targetOffset": 2582528,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_1/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 12377994,
+      "sha256": "33f18028557db91c81ced44a27d369928ddae326817b8470ef6e8e1e7c29fd33",
+      "targetOffset": 2583552,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_1/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 11589361,
+      "sha256": "be3f3169f8ae3e366747221b1dfc27f602109c47fe7e2ca87abe47440923c5ba",
+      "targetOffset": 2584576,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_1/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 11588296,
+      "sha256": "edf8fe7354e6b6cd3b6dadcd2c1966a622683bee06d06e0843092e267b49675e",
+      "targetOffset": 3371008,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_2/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 13956321,
+      "sha256": "0f6853e7eea835b1ec7ee39a095bd4afc36f28e5967d3649674abb17d7a00fd5",
+      "targetOffset": 3372032,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_2/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 13955261,
+      "sha256": "6000f7410f146e00e1964dce305d73bdfa1b3c7587a3452a5beefc9d2bd7c8b2",
+      "targetOffset": 3373056,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_2/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 12381211,
+      "sha256": "79d78654840fa89d676368306e28e881dc8336b3843d1f8b977c226f74b95ae9",
+      "targetOffset": 3374080,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_2/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 12380146,
+      "sha256": "af9ce072038db04b5206d059b1d9c9b7dffea51c8d88d7711273fe2980f18ff0",
+      "targetOffset": 4160512,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_2/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 13958459,
+      "sha256": "4948995ab692b637a6127ff1ad95208500c5d41ea31c5be02b10cc0005e4dda7",
+      "targetOffset": 4161536,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_2/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 13957399,
+      "sha256": "c75d915c2ca3bc12aa0b78a90e5e287ccd841d845ceec0b5d6948afb05e23353",
+      "targetOffset": 4162560,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_2/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 13168766,
+      "sha256": "67da44ec414b53758f833bcea5ffa4a879424170caf6aeda18290057b533a325",
+      "targetOffset": 4163584,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_2/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 13167701,
+      "sha256": "f8c43211e528515b92039a7eb6b778b80b05ed2ac2352b3c5d5cb592ed0551d8",
+      "targetOffset": 4950016,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_3/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 15535726,
+      "sha256": "c2721436201b3747443a87dc1d6d2c931e84d1163e5ba6cd64b5818ed0b1cef7",
+      "targetOffset": 4951040,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_3/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 15534666,
+      "sha256": "d6a24130abd53c04a7bf4781e527b57067e09b565b98c5d6b3882aa5eb8e56c1",
+      "targetOffset": 4952064,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_3/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 13960616,
+      "sha256": "6ccee1a87e666f57b7073659c58c41b2f0f7aff5fe6924e1c1ba10cf5bfc3545",
+      "targetOffset": 4953088,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_3/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 13959551,
+      "sha256": "1dbee463ac5f3e833c754eaf974533861574254fe651cee297937bbfabaf7843",
+      "targetOffset": 5739520,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_3/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 15537864,
+      "sha256": "b5774391d42e99e03c030d58fa4ed25291022867538385e20df57748f27479f5",
+      "targetOffset": 5740544,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_3/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 15536804,
+      "sha256": "b9594b8e89003e5d0d21917cef0caa93e51eb760e4af6fa65b3a37f3ef52907f",
+      "targetOffset": 5741568,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_3/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 14748171,
+      "sha256": "c881befaaa2dea93efbf5e2679d0bec4f67ea85e1a0d045fa6ed0d33327a6222",
+      "targetOffset": 5742592,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_3/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 14747106,
+      "sha256": "95f704c0c2ca451ff6631d055945f5fb7bdd9a0313207cd549d42ea658e2821b",
+      "targetOffset": 6529024,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_4/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 17115131,
+      "sha256": "1c4d04dce17d6d70c1e58bcf38cc81a85381d7baaf9e35a24356a03b9bf19b78",
+      "targetOffset": 6530048,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_4/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 17114071,
+      "sha256": "e93cfc677758615e36881db64645b5b6e458de7a0447ce278fc7c9829698bb7d",
+      "targetOffset": 6531072,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_4/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 15540021,
+      "sha256": "0eb3b9c20502000e401dfeb056ff59da816f59680c4bd1f6e8fc6abad310878c",
+      "targetOffset": 6532096,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_4/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 15538956,
+      "sha256": "bd18b116d06cef06b2c5c0471718154f66d45ddd1f0eaf5a3c5c22b5456f4950",
+      "targetOffset": 7318528,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_4/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 17117269,
+      "sha256": "362d4ea44fefc72ab3899b7b43129d27051f716d35e2d8f417950d662a26e8f1",
+      "targetOffset": 7319552,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_4/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 17116209,
+      "sha256": "6ce79cfc65dacc78b722b1e6168ad9705a2f7d3519eab156d61847a335108801",
+      "targetOffset": 7320576,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_4/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 16327576,
+      "sha256": "50292bed5024f225c3737b41a97108e016157774a455d5190c5db5c06a83c315",
+      "targetOffset": 7321600,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_4/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 16326511,
+      "sha256": "30b0aa88cf6b10c5320bd457ff4ff0ced2e6c2c84e4235e0ab76190eea7cdfc3",
+      "targetOffset": 8108032,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_5/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 18694536,
+      "sha256": "aee223a331c4e6109623519fb228457dbbb7cd3c0a0296c047256090041855e9",
+      "targetOffset": 8109056,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_5/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 18693476,
+      "sha256": "b7052ba1a87569479e4f8d07016d45bb9d86b4fec95b6f9045d406ffa8fcd312",
+      "targetOffset": 8110080,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_5/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 17119426,
+      "sha256": "ec4708e482fbf7ed5810c6a1ed005efcafbb83c6c418a408ce9a7b7bc63324a2",
+      "targetOffset": 8111104,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_5/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 17118361,
+      "sha256": "98f7a3ce280866a215d2db61bce1e6704a5a32f7fb2f881eb7817c828a4e0da8",
+      "targetOffset": 8897536,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_5/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 18696674,
+      "sha256": "35abf75f5c1ab9e28894c119eb5628a90b0587871bf2a52da46724b09a4c51fa",
+      "targetOffset": 8898560,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_5/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 18695614,
+      "sha256": "572cf63a6f8dd1c3a2fc41015b5fdd9491d00ebad4de372519110832d25b0115",
+      "targetOffset": 8899584,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_5/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 17906981,
+      "sha256": "8ba8861424222ed96b2bf45778479d95d009d74fcf51b744a1222e95700d2a22",
+      "targetOffset": 8900608,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_5/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 17905916,
+      "sha256": "a20f120abbee23eb01fd9633ffdacb43cfb691d5b2eeb87bddca8728a5d71f74",
+      "targetOffset": 9687040,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_6/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 20273941,
+      "sha256": "9fe6b1e28197126e1a505a0ea4857c75e3e6ea203b4c27bd7dc7833aaaab5ee5",
+      "targetOffset": 9688064,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_6/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 20272881,
+      "sha256": "639642f96c4ebf33ef7025771a32fee2f5da4b0c040d0d3bcd51d203c29cd34b",
+      "targetOffset": 9689088,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_6/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 18698831,
+      "sha256": "bfaf63092420a2828a7721617ee5d31c16677dd6ad617edffe2c87dddb9c1671",
+      "targetOffset": 9690112,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_6/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 18697766,
+      "sha256": "ae150e72bf359316ab04bbe129c94e20fe446d23eb1ccabbdd55b6b5740b80fb",
+      "targetOffset": 10476544,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_6/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 20276079,
+      "sha256": "919b312ee0c6fe9f77308485eca948cc8ec9bbeadd23534edb711e7ab7c2ac60",
+      "targetOffset": 10477568,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_6/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 20275019,
+      "sha256": "9b9febdbbf6a37e319d5d262d3c051b413b21fce045a83571dfa5eb84ab83449",
+      "targetOffset": 10478592,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_6/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 19486386,
+      "sha256": "ab53cecaebf851371318103caa4fb8b77c76c6ee68227213693eb1dedf1d2c3c",
+      "targetOffset": 10479616,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_6/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 19485321,
+      "sha256": "df330849b4dcc49d99934d1107999542bfbcb9583606a2411b8d206aa7c761c3",
+      "targetOffset": 11266048,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_7/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 21853346,
+      "sha256": "0ec98f0f01eef5ac45a3f008413affa699bf79891e65da086a80d40a96fb6ed9",
+      "targetOffset": 11267072,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_7/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 21852286,
+      "sha256": "114bcbbaad8306a1e96193ec20404e7f4a8bdb07720f7db9705de28a5a7adece",
+      "targetOffset": 11268096,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_7/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 20278236,
+      "sha256": "bfd550a8f5e2c3ae07be7df7c576a6ca6c28bef89e29a7d417a8128c521b8508",
+      "targetOffset": 11269120,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_7/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 20277171,
+      "sha256": "0fa862b55feafcff344edb50e660d595f3bb7cf97a320049b27ce0c7aabef0f3",
+      "targetOffset": 12055552,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_7/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 21855484,
+      "sha256": "470ee3e2d0c1757c74e7995b08a245664c9714ae4c75fb9f0a758ae32c2ec573",
+      "targetOffset": 12056576,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_7/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 21854424,
+      "sha256": "500eb452d3c256fcbb130c15289c34aa43b5138c4a19ec9e7aa30740d9dd110c",
+      "targetOffset": 12057600,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_7/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 21065791,
+      "sha256": "6f10e42443ff71e6e4d7e6f8849662c20a2940f66790d44aa38242f6b1719922",
+      "targetOffset": 12058624,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_7/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 21064726,
+      "sha256": "c73be3812eeeb4db3beeb9022e8b6748079784f291b78d41ec1f1e2c2d04e289",
+      "targetOffset": 12845056,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_8/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 23432751,
+      "sha256": "40d5e3ec7dcd2dbab12909a4a65bd559921f16d14d8458167db5f9b661b9bfba",
+      "targetOffset": 12846080,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_8/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 23431691,
+      "sha256": "e2e11a1b243555287d1c0599864841b967c8f8a49714cfb5444fd73693662cfb",
+      "targetOffset": 12847104,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_8/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 21857641,
+      "sha256": "a5ab7895a682e3596103ffa5ec382f02af8ce6fb836d00f9d3518271ecad643c",
+      "targetOffset": 12848128,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_8/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 21856576,
+      "sha256": "10432a620821062a93c9902ff6058ec6916da49a0a1c7705edf5f3cc32e4ffc4",
+      "targetOffset": 13634560,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_8/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 23434889,
+      "sha256": "5549e12d2d85140e2df4d783a08369453f717b06233ac3f0a189600d753cf011",
+      "targetOffset": 13635584,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_8/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 23433829,
+      "sha256": "593917203d1022fb1b9327be4c9d405544b5a90f5f44b33a129c0b6562606345",
+      "targetOffset": 13636608,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_8/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 22645196,
+      "sha256": "91fc5402d7ec0bf679938224ddc3a7ab5c45109603ea159b06d60bc2fa503a64",
+      "targetOffset": 13637632,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_8/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 22644131,
+      "sha256": "5bc3a574e8c2ed0f7ee837c18d2070e54c15c9a8dc79480892e7015083b251a3",
+      "targetOffset": 14424064,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_9/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 25012156,
+      "sha256": "2217926360f36c6b966419b86f48c90177420eaa3785a1ac22f4efe5d4fc96ce",
+      "targetOffset": 14425088,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_9/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 25011096,
+      "sha256": "53d010f90cd2ce0faa5090eafb0f1c8b5dc76bd5bbc79eac548ee18c67ae231e",
+      "targetOffset": 14426112,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_9/Conv_0/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 23437046,
+      "sha256": "3a94e0f40290ab47cba1226f1fcacb775eeaa781351206d3bf86195cf79d7b94",
+      "targetOffset": 14427136,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_9/Conv_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 23435981,
+      "sha256": "fbd12a384d18cc9f6bdd9f32d50007329e87ec38ef534758f1e29c8637f8e606",
+      "targetOffset": 15213568,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_9/LayerNorm_1/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 25014294,
+      "sha256": "d08772a4033fbd8381a76b5b8f376ce368ae9f2d9397152575a250fe42c9a38d",
+      "targetOffset": 15214592,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_9/LayerNorm_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 25013234,
+      "sha256": "25b4f4f0a3310f554f4f2610e9c2dfc4ef1249b29c429a057f6d75e690615155",
+      "targetOffset": 15215616,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_9/Conv_1/kernel",
+      "shape": [
+        3,
+        256,
+        256
+      ],
+      "bytes": 786432,
+      "offset": 24224601,
+      "sha256": "0e41bbb3418e9a1f81270fd7d267f412a5f6a2bdf3604f30bf90399f50712e42",
+      "targetOffset": 15216640,
+      "targetBytes": 786432,
+      "targetShape": [
+        256,
+        256,
+        3
+      ],
+      "transpose": [
+        2,
+        1,
+        0
+      ]
+    },
+    {
+      "name": "params/ResBlock1D_9/Conv_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 24223536,
+      "sha256": "1372829f5dcc309d41f0c01773bd77872b4b23ef6c6bba30ef6027b81650f440",
+      "targetOffset": 16003072,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/LayerNorm_0/scale",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 9220245,
+      "sha256": "103e8f61f982dc2041602f09bd07d15cc40fce92fee1c474bb4415058de5fbf8",
+      "targetOffset": 16004096,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/LayerNorm_0/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 9219179,
+      "sha256": "78f7b25abae3fd9406988b78a67446b24bf8877392fc6671c658b92488a82bbf",
+      "targetOffset": 16005120,
+      "targetBytes": 1024,
+      "targetShape": [
+        1,
+        256,
+        1
+      ]
+    },
+    {
+      "name": "params/Dense_1/kernel",
+      "shape": [
+        8704,
+        256
+      ],
+      "bytes": 8912896,
+      "offset": 215576,
+      "sha256": "db20b3e088cc42bb1a1937fbfc3cc2d8643e36ebf63f304e597338bc9f3744eb",
+      "targetOffset": 16006144,
+      "targetBytes": 8912896,
+      "targetShape": [
+        8704,
+        256
+      ]
+    },
+    {
+      "name": "params/Dense_1/bias",
+      "shape": [
+        256
+      ],
+      "bytes": 1024,
+      "offset": 214513,
+      "sha256": "9ef4769394e80deae8d627f1616e8e20939fd09a7cdea05fa3188f2387e41163",
+      "targetOffset": 24919040,
+      "targetBytes": 1024,
+      "targetShape": [
+        256
+      ]
+    },
+    {
+      "name": "params/Dense_2/kernel",
+      "shape": [
+        256,
+        87
+      ],
+      "bytes": 89088,
+      "offset": 9128916,
+      "sha256": "e37483e6cb38b6a0f14f14e061c22d5db1e8eb224a02787085fd7fc230f3efe0",
+      "targetOffset": 24920064,
+      "targetBytes": 89088,
+      "targetShape": [
+        256,
+        87
+      ]
+    },
+    {
+      "name": "params/Dense_3/kernel",
+      "shape": [
+        256,
+        1
+      ],
+      "bytes": 1024,
+      "offset": 9218101,
+      "sha256": "2f38eeed03dfb2befecb565687c7aa501c3b569c081bb69731b156df912eeb4e",
+      "targetOffset": 25009152,
+      "targetBytes": 1024,
+      "targetShape": [
+        256,
+        1
+      ]
+    }
+  ]
+}

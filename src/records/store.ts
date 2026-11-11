@@ -1,4 +1,5 @@
 import type { GameSnapshot, ModeId, SavedGame } from '../game/types';
+import { validateBotReplay } from '../game/replaySupport';
 import { MODES, getMode } from '../game/catalog';
 import { restoredStartPoints, validStartPoints } from '../game/startingPoints';
 import { validEndlessCheckpoint } from '../game/endlessCheckpoint';
@@ -38,6 +39,8 @@ const configKey = (save: SavedGame) => {
     if (rules.version !== 1) parts.push('sichuan', rules.version, rules.fanCap, rules.selfDraw, rules.menqingZhongzhang);
   }
   if (save.mode !== 'riichi' && save.mode != null && save.rulesVersion === 2) parts.push('rules', 2);
+  if ((save.aiVersion ?? 0) >= 7 && save.aiModel) parts.push('model', save.aiModel.id, save.aiModel.sha256,
+    save.aiModel.featureVersion, save.aiModel.policyVersion);
   if (save.matchLength === 'endless' && save.checkpoint) {
     const cp = save.checkpoint;
     parts.push('checkpoint', cp.sessionId, cp.sequence, cp.dealer, cp.rotation, cp.honba, cp.sticks, ...cp.points);
@@ -59,9 +62,21 @@ function migrateResumeConfig(config: string): string {
 const endlessHandId = (save: SavedGame) => save.matchLength === 'endless' && save.checkpoint
   ? `endless-hand:${JSON.stringify([save.checkpoint.sessionId, save.checkpoint.sequence])}` : undefined;
 const endlessHistoryId = (sessionId: string) => `endless-history:${JSON.stringify(sessionId)}`;
+function matchingBotDecisions(a: SavedGame, b: SavedGame, exact = false): boolean {
+  if ((a.aiVersion ?? 0) < 7) return true;
+  const left = a.botDecisions || [], right = b.botDecisions || [];
+  if (exact && left.length !== right.length) return false;
+  const recorded = new Map(right.map(decision => [`${decision.step}:${decision.playerId}:${decision.sequence}`, decision]));
+  return left.every(decision => {
+    const other = recorded.get(`${decision.step}:${decision.playerId}:${decision.sequence}`);
+    return other ? decision.key === other.key && decision.source === other.source : !exact;
+  });
+}
 const prefixMatches = (a: SavedGame, b: SavedGame) => configKey(a) === configKey(b)
-  && a.decisions.slice(0, Math.min(a.decisions.length, b.decisions.length)).every((decision, index) => decision.key === b.decisions[index].key);
-const exactSave = (a: SavedGame, b: SavedGame) => prefixMatches(a, b) && a.decisions.length === b.decisions.length && position(a) === position(b);
+  && a.decisions.slice(0, Math.min(a.decisions.length, b.decisions.length)).every((decision, index) => decision.key === b.decisions[index].key)
+  && matchingBotDecisions(a, b);
+const exactSave = (a: SavedGame, b: SavedGame) => prefixMatches(a, b) && a.decisions.length === b.decisions.length
+  && position(a) === position(b) && matchingBotDecisions(a, b, true);
 
 function safeStorage(): StoragePort | null {
   try { return typeof localStorage === 'undefined' ? null : localStorage; } catch { return null; }
@@ -92,6 +107,15 @@ export function validateSavedGame(value: unknown): SavedGame {
   if (value.aiVersion != null) save.aiVersion = Number(value.aiVersion);
   if (value.rulesVersion !== undefined) save.rulesVersion = value.rulesVersion;
   if (value.replayPosition != null) save.replayPosition = Number(value.replayPosition);
+  if ((save.aiVersion ?? 0) >= 7) {
+    save.botDecisions = value.botDecisions as SavedGame['botDecisions'];
+    save.aiModel = value.aiModel as SavedGame['aiModel'];
+    validateBotReplay(save);
+    save.botDecisions = save.botDecisions!.map(decision => ({ step: decision.step, playerId: decision.playerId,
+      sequence: decision.sequence, key: decision.key, ...(decision.source ? { source: decision.source } : {}) }));
+    if (save.aiModel) save.aiModel = { id: save.aiModel.id, sha256: save.aiModel.sha256,
+      featureVersion: save.aiModel.featureVersion, policyVersion: save.aiModel.policyVersion };
+  }
   if (value.matchLength === 'endless') {
     if (!validEndlessCheckpoint(value.checkpoint, save.mode)) throw new Error('无限牌谱缺少有效的单局起始信息。');
     const cp = value.checkpoint;

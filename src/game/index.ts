@@ -1,10 +1,12 @@
 import Majiang from '@kobalab/majiang-core';
 import { AI_VERSION, validDifficulty } from './ai/types';
-import type { BotAction, Difficulty } from './ai/types';
+import type { BotAction, BotDecision, Difficulty } from './ai/types';
 import { createBotObservation } from './ai/observation';
 import { chooseRiichiAction } from './ai/riichi';
 import { chooseLegacyAction } from './ai/legacy';
 import { BotDecisionService } from './ai/service';
+import { TanyaoDecisionService } from './ai/tanyaoService';
+import { TANYAO_MODEL_IDENTITY } from './ai/models/tanyaoFeatures';
 import { furitenView, MissedWinTracker } from './assist/furiten';
 import { furitenReasons, noYakuReason } from './ronNotice';
 import { createRiichiAssistCalculator, projectRiichiAssist } from './assist/riichiAssist';
@@ -14,7 +16,7 @@ import { newEndlessSessionId } from './endlessCheckpoint';
 import type {
   ActionType, EndlessCheckpoint, GameLogEntry, GameSnapshot, HandTile, LegalAction, MeldView,
   ReplayData, RiichiSessionAPI, RoundResult, SavedGame, SessionOptions, WinnerView, ConfirmedWinEvent,
-  QuickControls, ReplayFrame, RonNotice,
+  QuickControls, ReplayFrame, RonNotice, BotReplayDecision,
 } from './types';
 export type * from './types';
 
@@ -163,6 +165,11 @@ export class RiichiSession implements RiichiSessionAPI {
   private botJobs = 0;
   private botService = new BotDecisionService();
   private autoPlayService = new BotDecisionService();
+  private tanyaoService = new TanyaoDecisionService();
+  private botDecisions: BotReplayDecision[] = [];
+  private botSequences = new Map<string, number>();
+  private replayBotChoices = new Map<string, BotReplayDecision>();
+  private deferredBots: Array<() => void> = [];
   private autoPlayRequestVersion = 0;
   private missedWin = new MissedWinTracker();
   private calculateAssist = createRiichiAssistCalculator();
@@ -207,6 +214,7 @@ export class RiichiSession implements RiichiSessionAPI {
   private initialize(options: SessionOptions, checkpoint?: EndlessCheckpoint): void {
     this.cancelTimer();
     this.botService.cancel();
+    this.tanyaoService.dispose();
     this.autoPlayService.cancel(); this.autoPlayRequestVersion++;
     this.botJobs = 0;
     this.quickControls = updateQuickControls(this.quickControls, options.quickControls);
@@ -230,6 +238,7 @@ export class RiichiSession implements RiichiSessionAPI {
     this.ronNotice = undefined;
     this.log = [];
     this.decisions = [];
+    this.botDecisions = []; this.botSequences.clear(); this.deferredBots = [];
     this.pending = null;
     this.continueRound = null;
     this.rule = Majiang.rule({ '場数': this.options.matchLength === 'single' ? 0 : this.options.matchLength === 'east' ? 1 : 2 });
@@ -247,6 +256,7 @@ export class RiichiSession implements RiichiSessionAPI {
         points: [...model.defen], dealer: (model.qijia + model.jushu) % 4, rotation: this.endlessRotation,
         honba: model.changbang, sticks: model.lizhibang };
       this.decisions = []; this.step = 0; this.generation++;
+      this.botDecisions = []; this.botSequences.clear();
       // Only the current segment is replayable; earlier hands live in records.
       this.game._paipu.log = [];
       return originalDeal(seededWall(this.rule, randomFromSeed(`${this.options.seed}|endless:${this.handSequence}`)));
@@ -328,34 +338,62 @@ export class RiichiSession implements RiichiSessionAPI {
     } else this.decideBot(player, choices, choice => callback(choice.reply));
   }
   private decideBot(player: SessionPlayer, choices: Choice[], done: (choice: Choice) => void): void {
+    const human = player.seatId === 0;
+    const commit = (key: string, source: BotDecision['provider'] = 'algorithm') => {
+      const choice = choices.find(choice => choice.key === key) || choices[0];
+      if (this.aiVersion >= 7 && !human) {
+        const prefix = `${this.step}:${player.seatId}`, sequence = this.botSequences.get(prefix) || 0;
+        this.botSequences.set(prefix, sequence + 1);
+        this.botDecisions.push({ step: this.step, playerId: player.seatId, sequence, key: choice.key, source });
+      }
+      done(choice);
+    };
+    if (this.replaying && this.aiVersion >= 7 && !human) {
+      const prefix = `${this.step}:${player.seatId}`, sequence = this.botSequences.get(prefix) || 0;
+      const recorded = this.replayBotChoices.get(`${prefix}:${sequence}`);
+      if (recorded) {
+        if (!choices.some(choice => choice.key === recorded.key)) throw new Error('牌谱电脑操作与当前合法动作不一致。');
+        commit(recorded.key, recorded.source);
+      } else {
+        const generation = this.generation;
+        this.deferredBots.push(() => { if (generation === this.generation && !this.disposed) this.decideBot(player, choices, done); });
+      }
+      return;
+    }
     const observation = createBotObservation(player.seatId, player._menfeng, player.shoupai.toString(), player.model, this.options.matchLength);
     const actions = botActions(choices);
-    const human = player.seatId === 0;
     const difficulty = human ? this.options.autoPlayDifficulty : this.options.difficulty;
-    const decisionVersion = human ? AI_VERSION : this.aiVersion;
+    const decisionVersion = human ? this.aiVersion >= 7 ? AI_VERSION : 6 : this.aiVersion;
     const legacyOpponent = !human && this.aiVersion === 1;
     const synchronous = () => legacyOpponent
       ? chooseLegacyAction(observation, actions)
       : chooseRiichiAction(observation, actions, difficulty, decisionVersion).key;
     if (this.replaying || typeof Worker === 'undefined' || legacyOpponent || !['advanced', 'expert'].includes(difficulty)) {
       const key = synchronous();
-      done(choices.find(choice => choice.key === key) || choices[0]);
+      commit(key);
       return;
     }
+    const win = this.aiVersion >= 7 && choices.find(choice => choice.type === 'ron' || choice.type === 'tsumo');
+    if (win) { commit(win.key); return; }
     const generation = this.generation;
     const autoPlayRequestVersion = this.autoPlayRequestVersion;
     this.botJobs++;
     let released = false;
     const current = () => !human || (this.options.autoPlay && autoPlayRequestVersion === this.autoPlayRequestVersion);
-    const finish = (key?: string) => {
+    const finish = (key?: string, source?: BotDecision['provider']) => {
       if (generation !== this.generation || this.disposed) return;
       if (!released) { released = true; this.botJobs = Math.max(0, this.botJobs - 1); }
-      if (key && current()) done(choices.find(choice => choice.key === key) || choices[0]);
+      if (key && current()) commit(key, source);
       this.publish(); this.schedule();
     };
-    const service = human ? this.autoPlayService : this.botService;
-    service.choose(observation, actions, difficulty, decisionVersion).then(
-      decision => finish(decision?.key),
+    const request = this.aiVersion >= 7
+      ? this.tanyaoService.choose(observation, actions, difficulty, {
+        drawn: typeof player.shoupai._zimo === 'string' && /^[mpsz]\d$/.test(player.shoupai._zimo) ? player.shoupai._zimo : null,
+        furiten: !player._neng_rong,
+      }, human ? 'autoplay' : 'opponent')
+      : (human ? this.autoPlayService : this.botService).choose(observation, actions, difficulty, decisionVersion);
+    request.then(
+      decision => finish(decision?.key, decision?.provider),
       () => { if (generation === this.generation && !this.disposed) finish(current() ? synchronous() : undefined); },
     );
   }
@@ -465,13 +503,14 @@ export class RiichiSession implements RiichiSessionAPI {
   }
   setAutoPlay(enabled: boolean): void {
     this.options.autoPlay = enabled;
-    if (!enabled) { this.autoPlayRequestVersion++; this.autoPlayService.cancel(); }
+    if (!enabled) { this.autoPlayRequestVersion++; this.autoPlayService.cancel(); this.tanyaoService.cancel('autoplay'); }
     this.cancelTimer(); this.publish(); this.schedule();
   }
   setAutoPlayDifficulty(difficulty: Difficulty): void {
     if (!validDifficulty(difficulty) || this.options.autoPlayDifficulty === difficulty) return;
     this.options.autoPlayDifficulty = difficulty;
     this.autoPlayRequestVersion++; this.autoPlayService.cancel();
+    this.tanyaoService.cancel('autoplay');
     this.cancelTimer(); this.publish(); this.schedule();
   }
   setAutoExchangeThree(enabled: boolean): void {
@@ -526,18 +565,21 @@ export class RiichiSession implements RiichiSessionAPI {
     if (this.replaying) return;
     for (const listener of this.listeners) listener();
   }
-  getSavedGame(): SavedGame { return { version: 1, mode: 'riichi', seed: this.options.seed, matchLength: this.options.matchLength, difficulty: this.options.difficulty, startPoints: this.rule['配給原点'], autoPlayDifficulty: this.options.autoPlayDifficulty, autoExchangeThree: this.options.autoExchangeThree, aiVersion: this.aiVersion, replayPosition: this.step, decisions: this.decisions.map(decision => ({ ...decision })), ...(this.checkpoint ? { checkpoint: structuredClone(this.checkpoint) } : {}) }; }
+  getSavedGame(): SavedGame { return { version: 1, mode: 'riichi', seed: this.options.seed, matchLength: this.options.matchLength, difficulty: this.options.difficulty, startPoints: this.rule['配給原点'], autoPlayDifficulty: this.options.autoPlayDifficulty, autoExchangeThree: this.options.autoExchangeThree, aiVersion: this.aiVersion, replayPosition: this.step, decisions: this.decisions.map(decision => ({ ...decision })),
+    ...(this.aiVersion>=7?{botDecisions:this.botDecisions.map(decision=>({...decision})).sort((a,b)=>a.step-b.step||a.playerId-b.playerId||a.sequence-b.sequence),aiModel:{...TANYAO_MODEL_IDENTITY}}:{}),
+    ...(this.checkpoint ? { checkpoint: structuredClone(this.checkpoint) } : {}) }; }
   exportReplay(): ReplayData {
     // A live export omits the core log because it contains opponents' unexposed hands and wall draws.
     return { ...this.getSavedGame(), rules: structuredClone(this.rule), log: this.finished ? structuredClone(this.game._paipu) : [...this.log] };
   }
   loadSavedGame(data: SavedGame): boolean {
-    if (!data || data.version !== 1 || (data.mode != null && data.mode !== 'riichi') || (data.difficulty != null && !validDifficulty(data.difficulty)) || (data.aiVersion != null && ![1, 2, 3, 4, 5, AI_VERSION].includes(data.aiVersion)) || typeof data.seed !== 'string' || !['single', 'east', 'hanchan', 'endless'].includes(data.matchLength) || !Array.isArray(data.decisions) || data.decisions.length > 10000 || !data.decisions.every(decision => decision && typeof decision.key === 'string')) return false;
+    if (!data || data.version !== 1 || (data.mode != null && data.mode !== 'riichi') || (data.difficulty != null && !validDifficulty(data.difficulty)) || (data.aiVersion != null && ![1, 2, 3, 4, 5, 6, AI_VERSION].includes(data.aiVersion)) || typeof data.seed !== 'string' || !['single', 'east', 'hanchan', 'endless'].includes(data.matchLength) || !Array.isArray(data.decisions) || data.decisions.length > 10000 || !data.decisions.every(decision => decision && typeof decision.key === 'string')) return false;
     try { validateReplayData(data); } catch { return false; }
     const previous = this.getSavedGame();
     const restore = (save: SavedGame): boolean => {
       this.replaying = true;
       this.aiVersion = save.aiVersion ?? 1;
+      this.replayBotChoices = new Map((save.botDecisions || []).map(decision => [`${decision.step}:${decision.playerId}:${decision.sequence}`, decision]));
       this.initialize({ seed: save.seed, matchLength: save.matchLength, difficulty: save.difficulty || 'standard', autoPlayDifficulty: save.autoPlayDifficulty ?? 'expert', autoExchangeThree: save.autoExchangeThree ?? false, autoPlay: false, quickControls: DEFAULT_QUICK_CONTROLS }, save.checkpoint);
       let cursor = 0;
       for (let limit = 0; limit < 100000; limit++) {
@@ -559,9 +601,11 @@ export class RiichiSession implements RiichiSessionAPI {
           const choice = this.pending.choices.find(item => item.key === key);
           if (!choice) return false;
           this.choosePending(choice);
-        } else this.advance();
+        } else if (this.deferredBots.length) break;
+        else this.advance();
       }
-      return cursor === save.decisions.length && (save.replayPosition == null || this.step === save.replayPosition);
+      return cursor === save.decisions.length && (save.replayPosition == null || this.step === save.replayPosition)
+        && (this.aiVersion < 7 || this.botDecisions.length === (save.botDecisions || []).length);
     };
     let succeeded = false;
     try { succeeded = restore(data); } catch { succeeded = false; }
@@ -569,6 +613,9 @@ export class RiichiSession implements RiichiSessionAPI {
       try { restore(previous); } catch { this.newGame({ autoPlay: false }); }
     }
     this.replaying = false;
+    this.replayBotChoices.clear();
+    const deferred = this.deferredBots; this.deferredBots = [];
+    for (const resume of deferred) queueMicrotask(resume);
     this.publish();
     this.schedule();
     return succeeded;
@@ -578,6 +625,7 @@ export class RiichiSession implements RiichiSessionAPI {
     validateReplayData(data);
     this.cancelTimer(); this.botService.cancel(); this.autoPlayService.cancel(); this.autoPlayRequestVersion++; this.botJobs = 0;
     this.replaying = true; this.replayFrames = []; this.aiVersion = data.aiVersion ?? 1;
+    this.replayBotChoices = new Map((data.botDecisions || []).map(decision => [`${decision.step}:${decision.playerId}:${decision.sequence}`, decision]));
     this.initialize({ seed: data.seed, matchLength: data.matchLength, difficulty: data.difficulty || 'standard', autoPlayDifficulty: data.autoPlayDifficulty ?? 'expert', autoExchangeThree: data.autoExchangeThree ?? false, autoPlay: false, speed: 0, quickControls: DEFAULT_QUICK_CONTROLS }, data.checkpoint);
     let cursor = 0;
     for (let guard = 0; guard < MAX_REPLAY_STEPS; guard++) {
@@ -598,13 +646,15 @@ export class RiichiSession implements RiichiSessionAPI {
         // Legacy files have no precise progress marker. Commit only their final
         // explicit action; a final pass must not invent a subsequent draw.
         if (!exactEnd && cursor === data.decisions.length && choice.type !== 'pass') this.advance();
-      } else this.advance();
+      } else if (this.deferredBots.length) throw new Error('牌谱缺少当前电脑操作。');
+      else this.advance();
       if (guard % 48 === 47) await yieldReplayWork();
     }
-    if (cursor !== data.decisions.length || (data.replayPosition != null && this.step !== data.replayPosition)) throw new Error('牌谱未能在记录的位置结束，可能已损坏或超限。');
+    if (cursor !== data.decisions.length || (data.replayPosition != null && this.step !== data.replayPosition)
+      || this.aiVersion >= 7 && this.botDecisions.length !== (data.botDecisions || []).length) throw new Error('牌谱未能在记录的位置结束，可能已损坏或超限。');
     return finishReplayFrames(this.replayFrames);
   }
-  dispose(): void { this.disposed = true; this.generation++; this.autoPlayRequestVersion++; this.cancelTimer(); this.listeners.clear(); this.pending = null; this.botService.cancel(); this.autoPlayService.cancel(); this.botJobs = 0; }
+  dispose(): void { this.disposed = true; this.generation++; this.autoPlayRequestVersion++; this.cancelTimer(); this.listeners.clear(); this.pending = null; this.botService.cancel(); this.autoPlayService.cancel(); this.tanyaoService.dispose(); this.deferredBots = []; this.botJobs = 0; }
 }
 
 export function createSession(options: SessionOptions = {}): RiichiSessionAPI { return new RiichiSession(options); }

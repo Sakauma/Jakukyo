@@ -1,0 +1,20 @@
+{
+  "id": "riichi-tanyao-bc-v2-g186",
+  "publisher": "Twu31 / twu3202",
+  "repository": "https://huggingface.co/Twu31/TanyaoDojo",
+  "revision": "67fbc93eb93fbdda5abd2b847bc22073ce7ec59c",
+  "license": "MIT",
+  "licenseDeclaration": "https://github.com/twu3202/TanyaoDojo/blob/b44f7a62440db96186fa1c9553e1c6edb8e1bb71/LICENSING.md",
+  "sourceRepository": "https://github.com/twu3202/TanyaoDojo",
+  "sourceRevision": "b44f7a62440db96186fa1c9553e1c6edb8e1bb71",
+  "weights": {
+    "file": "bc_v2_g186.pkl",
+    "url": "https://huggingface.co/Twu31/TanyaoDojo/resolve/67fbc93eb93fbdda5abd2b847bc22073ce7ec59c/bc_v2_g186.pkl",
+    "bytes": 25015327,
+    "sha256": "b94b6768f6dbcc0b92a23faa1173b70936fc5db1413312c0488e293c5d86d512"
+  },
+  "graph": { "bytes": 32316, "sha256": "61692c3648d3ab38eeaa8a2727958dff124e39acdad177cf5313a16c555d820f" },
+  "deployment": { "bytes": 25010176, "sha256": "5c5d831c5ea55f389df2471a9074a8bac658894e59ae5954b6d06a98b351da2c" },
+  "conversion": { "format": "ONNX external data", "storedType": "float32", "computeType": "float32", "opset": 13, "irVersion": 9 },
+  "runtime": { "package": "onnxruntime-web", "version": "1.23.2", "license": "MIT", "wasmSha256": "45eaee27761ad883742a8d4b8fce1538d60ce43b51adf1726fafccc59b8c1a15" }
+}

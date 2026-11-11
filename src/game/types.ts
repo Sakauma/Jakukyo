@@ -195,6 +195,8 @@ export interface GameSnapshot {
   riichiAssist?: RiichiAssistView;
   regionalAssist?: RegionalHandHint;
   rulesVersion?: 1 | 2;
+  /** New MCR tables conceal opponents' kong identities until the round is revealed. */
+  hideOpponentConcealedKongs?: boolean;
   mode?: ModeId;
   modeName?: string;
   difficulty?: Difficulty;
@@ -224,6 +226,19 @@ export interface SessionOptions {
   matchLength?: 'hanchan' | 'east' | 'single' | 'endless';
 }
 export interface ReplayDecision { key: string }
+export interface BotReplayDecision {
+  step: number;
+  playerId: number;
+  sequence: number;
+  key: string;
+  source?: 'algorithm' | 'mcr-model-hybrid' | 'riichi-model-hybrid';
+}
+export interface SavedAiModel {
+  id: string;
+  sha256: string;
+  featureVersion: number;
+  policyVersion: number;
+}
 /** Public round-start state sufficient to resume one deterministic endless hand. */
 export interface EndlessCheckpoint {
   version: 1;
@@ -247,6 +262,8 @@ export interface SavedGame {
   startPoints?: number;
   difficulty?: Difficulty;
   aiVersion?: number;
+  botDecisions?: BotReplayDecision[];
+  aiModel?: SavedAiModel;
   rulesVersion?: 1 | 2;
   /** Last selected human autoplay level; historical actions remain explicit decisions. */
   autoPlayDifficulty?: Difficulty;
