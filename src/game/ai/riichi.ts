@@ -2,6 +2,8 @@ import Majiang from '@kobalab/majiang-core';
 import { evaluateDanger, normalTile, parseConcealed, parseMeld, rankPublicCandidates, seededRandom, TILE_TYPES, tileIndex, visibleCounts } from './evaluator';
 import type { BotAction, BotDecision, BotObservation, Difficulty, GenericCandidate } from './types';
 import { AI_VERSION } from './types';
+import { improvingDrawQuality, rankRiichiCandidates, readyHandMetrics } from './riichiEvaluation';
+import type { RiichiCandidate } from './riichiEvaluation';
 
 type Hand = any;
 const SEARCH_NODES = 240;
@@ -73,13 +75,16 @@ function handValue(hand: Hand, observation: BotObservation, riichi: boolean, sha
   return Math.min(16000, 1000 * Math.pow(2, Math.max(0, han - 1))) * (observation.seat === 0 ? 1.5 : 1);
 }
 
-function basicMetrics(hand: Hand, key: string, discard: string, observation: BotObservation, known: number[], riichi = false): GenericCandidate {
+function basicMetrics(hand: Hand, key: string, discard: string, observation: BotObservation, known: number[], riichi = false, calibrated = false): RiichiCandidate {
   const shanten = Majiang.Util.xiangting(hand);
   const effective: string[] = Majiang.Util.tingpai(hand) || [];
   const ukeire = effective.reduce((sum, tile) => sum + Math.max(0, (observation.tileLimits?.[tileIndex(tile)] ?? 4) - known[tileIndex(tile)]), 0);
-  return { key, tile: discard.slice(0, 2), shanten, ukeire,
-    estimatedValue: handValue(hand, observation, riichi, shanten, effective),
+  const ready = calibrated && shanten === 0 ? readyHandMetrics(hand, observation, known, discard.slice(0, 2), riichi) : undefined;
+  const candidate = { key, tile: discard.slice(0, 2), shanten, ukeire,
+    estimatedValue: ready?.estimatedValue ?? handValue(hand, observation, riichi, shanten, effective),
     shapeScore: shapeValue(hand, discard, observation) };
+  if (!calibrated) return candidate;
+  return { ...candidate, riichi, ...ready };
 }
 
 /** Two future own draws sampled from unseen tile counts, never from the actual wall. */
@@ -131,6 +136,10 @@ function lookAhead(hand: Hand, observation: BotObservation, known: number[], bud
 
 export function chooseRiichiAction(observation: BotObservation, actions: BotAction[], difficulty: Difficulty, aiVersion = AI_VERSION): BotDecision {
   if (!actions.length) throw new Error('AI cannot decide without legal actions.');
+  const calibrated = aiVersion >= 6 && observation.playerCount === 4 && (difficulty === 'advanced' || difficulty === 'expert');
+  const rank = (candidates: RiichiCandidate[], phase: 'discard' | 'response' = 'discard') => calibrated
+    ? rankRiichiCandidates(observation, candidates, difficulty, phase)
+    : rankPublicCandidates(observation, candidates, difficulty);
   const quick = (action: BotAction, strategy: BotDecision['strategy']): BotDecision => ({ key: action.key, difficulty, strategy, candidates: [], searchNodes: 0, searchBudget: 0 });
   const win = actions.find(action => action.type === 'ron' || action.type === 'tsumo');
   if (win) return quick(win, 'win');
@@ -139,16 +148,16 @@ export function chooseRiichiAction(observation: BotObservation, actions: BotActi
   const currentShanten = Majiang.Util.xiangting(hand);
   const pass = actions.find(action => action.type === 'pass');
   const discards = actions.filter(action => action.discard);
-  const metrics: GenericCandidate[] = [];
+  const metrics: RiichiCandidate[] = [];
   const hands = new Map<string, Hand>();
-  const cache = new Map<string, GenericCandidate>();
+  const cache = new Map<string, RiichiCandidate>();
   for (const action of discards) {
     const discard = action.discard!.replace('*', '');
     const cacheKey = discard + (action.type === 'riichi' ? '*' : '');
     let candidate = cache.get(cacheKey);
     const next = hand.clone().dapai(discard);
     if (!candidate) {
-      candidate = basicMetrics(next, action.key, discard, observation, known, action.type === 'riichi');
+      candidate = basicMetrics(next, action.key, discard, observation, known, action.type === 'riichi', calibrated);
       cache.set(cacheKey, candidate);
     }
     metrics.push({ ...candidate, key: action.key });
@@ -156,8 +165,34 @@ export function chooseRiichiAction(observation: BotObservation, actions: BotActi
     hands.set(action.key, next);
   }
   if (metrics.length) {
-    let result = rankPublicCandidates(observation, metrics, difficulty);
-    if (difficulty === 'expert') {
+    let result = rank(metrics);
+    if (difficulty === 'expert' && calibrated) {
+      const bestShanten = Math.min(...metrics.map(candidate => candidate.shanten));
+      const unique: RiichiCandidate[] = [];
+      const seen = new Set<string>();
+      if (evaluateDanger(observation, 'z1', known).maximumThreat < .6) {
+        for (const ranked of result.candidates) {
+          const candidate = metrics.find(item => item.key === ranked.key)!;
+          if (candidate.shanten !== bestShanten || candidate.shanten <= 0) continue;
+          const identity = normalTile(candidate.tile || '');
+          if (!seen.has(identity)) { seen.add(identity); unique.push(candidate); }
+          if (unique.length === 3) break;
+        }
+      }
+      let nodes = 0;
+      for (const candidate of unique) {
+        const search = improvingDrawQuality(hands.get(candidate.key)!, observation, known, Math.floor(SEARCH_NODES / unique.length));
+        nodes += search.nodes;
+        for (const item of metrics) {
+          if (item.shanten === candidate.shanten && normalTile(item.tile || '') === normalTile(candidate.tile || '')) item.lookahead = search.value;
+        }
+      }
+      if (unique.length) {
+        result = rank(metrics);
+        result.searchNodes = nodes;
+        result.searchBudget = SEARCH_NODES;
+      }
+    } else if (difficulty === 'expert') {
       // Search the best three distinct discard identities; riichi/dama share the sampled trajectory.
       const unique: GenericCandidate[] = [];
       const seen = new Set<string>();
@@ -173,7 +208,7 @@ export function chooseRiichiAction(observation: BotObservation, actions: BotActi
         nodes += search.nodes;
         for (const item of metrics) if (normalTile(item.tile || '') === normalTile(candidate.tile || '')) item.lookahead = search.value;
       }
-      result = rankPublicCandidates(observation, metrics, difficulty);
+      result = rank(metrics);
       result.searchNodes = nodes;
       result.searchBudget = SEARCH_NODES;
     }
@@ -193,7 +228,9 @@ export function chooseRiichiAction(observation: BotObservation, actions: BotActi
       for (const kan of actions.filter(action => action.type === 'kan' && action.meld)) {
         const next = hand.clone().gang(kan.meld);
         const distance = Majiang.Util.xiangting(next);
-        if (distance > baseline.shanten || !safeOpenYaku(next, observation)) continue;
+        const viableYaku = safeOpenYaku(next, observation)
+          || calibrated && distance === 0 && readyHandMetrics(next, observation, known, '', false).ukeire > 0;
+        if (distance > baseline.shanten || !viableYaku) continue;
         if (distance === 0 && baseline.shanten === 0) {
           baselineWaits ??= Majiang.Util.tingpai(hands.get(baseline.key)!) || [];
           const waits = Majiang.Util.tingpai(next) || [];
@@ -204,27 +241,41 @@ export function chooseRiichiAction(observation: BotObservation, actions: BotActi
     }
     return result;
   }
-  const callCandidates: { action: BotAction; metric: GenericCandidate }[] = [];
+  const callCandidates: { action: BotAction; metric: RiichiCandidate }[] = [];
   for (const action of actions.filter(item => item.meld && ['chi', 'pon', 'kan'].includes(item.type))) {
     const next = hand.clone().fulou(action.meld);
     // v2 checked before the mandatory discard, which rejected calls when the
     // only no-yaku obstacle was exactly the tile about to be discarded.
     // Keep that branch intact for deterministic reconstruction of old opponents.
-    if ((aiVersion < 3 || action.type === 'kan') && !safeOpenYaku(next, observation)) continue;
+    if (!calibrated && (aiVersion < 3 || action.type === 'kan') && !safeOpenYaku(next, observation)) continue;
     if (action.type === 'kan') {
+      if (calibrated) {
+        if (observation.tilesLeft > 12 && !observation.players.some(player => player.id !== observation.ownId && player.riichi)
+          && Majiang.Util.xiangting(next) <= currentShanten) {
+          const metric = basicMetrics(next, action.key, '', observation, known, false, true);
+          if (metric.shanten === 0 ? metric.ukeire > 0 : safeOpenYaku(next, observation)) callCandidates.push({ action, metric });
+        }
+        continue;
+      }
       if (observation.tilesLeft > 12 && !observation.players.some(player => player.id !== observation.ownId && player.riichi)
         && Majiang.Util.xiangting(next) < currentShanten) return quick(action, 'call');
       continue;
     }
     for (const discard of next.get_dapai() || []) {
       const after = next.clone().dapai(discard);
-      if (aiVersion >= 3 && !safeOpenYaku(after, observation)) continue;
-      const candidate = basicMetrics(after, action.key, discard, observation, known);
+      if (!calibrated && aiVersion >= 3 && !safeOpenYaku(after, observation)) continue;
+      const candidate = basicMetrics(after, action.key, discard, observation, known, false, calibrated);
+      if (calibrated && (candidate.shanten === 0 ? candidate.ukeire === 0 : !safeOpenYaku(after, observation))) continue;
       if (candidate.shanten < currentShanten) callCandidates.push({ action, metric: candidate });
     }
   }
   if (callCandidates.length) {
-    const ranked = rankPublicCandidates(observation, callCandidates.map(item => item.metric), difficulty);
+    if (calibrated && pass) {
+      const baseline = basicMetrics(hand, pass.key, '', observation, known, false, true);
+      const ranked = rank([...callCandidates.map(item => item.metric), baseline], 'response');
+      return { ...ranked, strategy: ranked.key === pass.key ? 'pass' : 'call' };
+    }
+    const ranked = rank(callCandidates.map(item => item.metric));
     const best = ranked.candidates[0];
     const danger = best.tile ? evaluateDanger(observation, best.tile, known) : { maximumThreat: 0 };
     if (!(difficulty === 'advanced' || difficulty === 'expert') || danger.maximumThreat < .65 || best.shanten === 0 && best.estimatedValue >= 3900) {

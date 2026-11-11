@@ -1,12 +1,12 @@
 /** All AI input is a structured-clone-safe projection of one player's information. */
 export type Difficulty = 'novice' | 'standard' | 'advanced' | 'expert';
 
-export const AI_VERSION = 5;
+export const AI_VERSION = 6;
 export const DIFFICULTIES: ReadonlyArray<{ id: Difficulty; label: string; description: string }> = [
   { id: 'novice', label: '入门', description: '辨认搭子与孤张，适合熟悉规则。' },
   { id: 'standard', label: '标准', description: '计算向听与有效进张，选择有役的鸣牌。' },
   { id: 'advanced', label: '进阶', description: '结合手牌价值、现物与筋壁，判断进攻或防守。' },
-  { id: 'expert', label: '高手', description: '在攻守评估上增加有限两巡搜索与点差策略。' },
+  { id: 'expert', label: '高手', description: '兼顾牌形、打点与防守，结合点差选择行动。' },
 ];
 
 export function validDifficulty(value: unknown): value is Difficulty {
