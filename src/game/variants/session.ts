@@ -1,10 +1,13 @@
 import type { Difficulty, BotObservation, GenericCandidate } from '../ai/types';
 import { AI_VERSION, validDifficulty } from '../ai/types';
 import { rankPublicCandidates, samplePublicDraws } from '../ai/evaluator';
+import { chooseRegionalAction } from '../ai/regional';
+import type { RegionalBotInput } from '../ai/regional';
+import { RegionalDecisionService } from '../ai/regionalService';
 import { getMode } from '../catalog';
-import type { ConfirmedWinEvent, EndlessCheckpoint, GameLogEntry, GameSessionAPI, GameSnapshot, LegalAction, MeldView, ModeId, QuickControls, ReplayData, ReplayFrame, RonNotice, RoundResult, SavedGame, SelfWinNotice, SessionOptions, SichuanOptions, WinnerView } from '../types';
+import type { ConfirmedWinEvent, EndlessCheckpoint, GameLogEntry, GameSessionAPI, GameSnapshot, LegalAction, MeldView, ModeId, QuickControls, ReplayData, ReplayFrame, RegionalHandHint, RegionalWaitView, RonNotice, RoundResult, SavedGame, SelfWinNotice, SessionOptions, SichuanOptions, WinnerView } from '../types';
 import { decompose, shanten } from './hand';
-import { getProfile, isBurstReady, nextWildcard, profileTiles, scoreHand } from './rules';
+import { evaluateMcrHand, getProfile, isBurstReady, isMcrWinningShape, nextWildcard, profileTiles, scoreHand } from './rules';
 import type { HandScore, RuleProfile, ScoreContext, ScoringPlayer } from './rules';
 import { coreMeld, coreString, countsOf, norm, seededRandom, shuffle, sortTiles, tileCode, tileIndex, tileLabel, WINDS } from './tiles';
 import { createRiichiAssistCalculator, projectRiichiAssist } from '../assist/riichiAssist';
@@ -21,7 +24,7 @@ interface Player extends ScoringPlayer {
   hasWon:boolean;winCount:number;temporaryFuriten:boolean;permanentFuriten:boolean;lastDrawKan:boolean;canSelfWin:boolean;floatCount:number;
 }
 interface Choice extends LegalAction { key:string;index?:number;meldIndex?:number;consume?:string[];kind?:'concealed'|'added'|'open' }
-interface ResponseEvent { kind:'discard'|'kan';from:number;tile:string;meldIndex?:number;riichi?:boolean;kongDiscard?:boolean;firstDealerDiscard?:boolean;choices:Map<number,Choice[]>;replies:Map<number,Choice|undefined> }
+interface ResponseEvent { kind:'discard'|'kan';from:number;tile:string;meldIndex?:number;riichi?:boolean;kongDiscard?:boolean;firstDealerDiscard?:boolean;choices:Map<number,Choice[]>;replies:Map<number,Choice|undefined>;pendingHuman?:Choice }
 type Stage='exchange'|'void'|'draw'|'discard'|'response'|'settlement'|'match';
 const NAMES=['你','青岚','千鹤','北辰'];
 let displaySessionSequence=0;
@@ -77,8 +80,15 @@ export class RegionalSession implements GameSessionAPI {
   private disposed=false;
   private replaying=false;
   private aiVersion=AI_VERSION;
+  private rulesVersion: 1 | 2 = 2;
+  private mcrWaitCache = new Map<string, string[]>();
+  private handHintCache = new Map<string, RegionalHandHint>();
   private step=0;
-  private regionalHintCache?:{key:string;shanten:number|null;waits:string[]};
+  private regionalHintCache?: { key: string; hint: RegionalHandHint };
+  private readonly decisionService = new RegionalDecisionService();
+  private decisionGeneration = 0;
+  private decisionCache = new Map<string, string>();
+  private pendingDecisions = new Set<string>();
 
   constructor(options:SessionOptions={}){
     const mode=options.mode||'guangdong';
@@ -89,16 +99,37 @@ export class RegionalSession implements GameSessionAPI {
   getSnapshot=():GameSnapshot=>this.snapshot;
   subscribe=(listener:()=>void):(()=>void)=>{this.listeners.add(listener);return()=>this.listeners.delete(listener);};
   private log(text:string,playerId?:number,tile?:string){this.logs.push({id:++this.logSequence,text,playerId,tile});if(this.logs.length>180)this.logs.shift();}
-  private cancel(){if(this.timer!==null)clearTimeout(this.timer);this.timer=null;}
+  private cancel(){
+    if(this.timer!==null)clearTimeout(this.timer);
+    this.timer=null;
+    this.decisionGeneration++;
+    this.decisionService.cancel();
+    this.decisionCache.clear();
+    this.pendingDecisions.clear();
+  }
   private seat(id:number){return (id-this.dealer+this.profile.players)%this.profile.players;}
   private playerAtSeat(seat:number){return (this.dealer+seat)%this.profile.players;}
-  private distance(tiles:string[],melds:MeldView[]=[]){return shanten(tiles,melds,this.profile.sets,this.wildcard,this.profile.sevenPairs,this.profile.orphans);}
+  private distance(tiles: string[], melds: MeldView[] = []): number {
+    const distance = shanten(tiles, melds, this.profile.sets, this.wildcard, this.profile.sevenPairs, this.profile.orphans);
+    if (this.profile.id !== 'mcr' || this.rulesVersion === 1 || distance < 0) return distance;
+    if (tiles.length % 3 === 1 && this.mcrShapeWaits(tiles, melds).length) return 0;
+    if (tiles.length % 3 === 2 && isMcrWinningShape(tiles.slice(0, -1), melds, tiles[tiles.length - 1])) return -1;
+    return distance;
+  }
+  private effectiveAiVersion(player: Player): number {
+    return player.id === 0 && !this.replaying ? AI_VERSION : this.aiVersion;
+  }
+  private canDeclareKong(): boolean {
+    if (this.rulesVersion === 1) return this.sichuanOptions?.version === 2 || this.kanCount < 4;
+    return this.profile.maxKongs === null || this.kanCount < this.profile.maxKongs;
+  }
   private nextActive(id:number){for(let n=1;n<=this.profile.players;n++){const next=(id+n)%this.profile.players;if(!this.players[next].hasWon||this.profile.continuing!=='blood')return next;}return id;}
   private active(){return this.players.filter(p=>!p.hasWon||this.profile.continuing!=='blood');}
   private makePlayer(id:number):Player{return {id,points:this.options.startPoints,hand:[],melds:[],flowers:[],kita:0,riichi:false,drawn:null,discards:[],hasWon:false,winCount:0,temporaryFuriten:false,permanentFuriten:false,lastDrawKan:false,canSelfWin:true,floatCount:0};}
   newGame(options:SessionOptions={}){this.initialize(options);}
   private initialize(options:SessionOptions,checkpoint?:EndlessCheckpoint){
-    if(!this.replaying)this.aiVersion=AI_VERSION;
+    if (!this.replaying) this.aiVersion = AI_VERSION;
+    this.rulesVersion = options.rulesVersion ?? (this.replaying ? 1 : 2);
     this.quickControls=updateQuickControls(this.quickControls,options.quickControls);
     this.cancel();const mode=options.mode||this.options.mode;this.profile=getProfile(mode);if(!this.profile)throw new Error('未实现的规则');
     this.options={...this.options,...options,mode,seed:options.seed||this.options.seed,startPoints:validStartPoints(mode,options.startPoints)?options.startPoints:this.profile.startPoints,autoPlayDifficulty:validDifficulty(options.autoPlayDifficulty)?options.autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:options.autoExchangeThree??this.options.autoExchangeThree};
@@ -115,6 +146,7 @@ export class RegionalSession implements GameSessionAPI {
   }
   private deal(){
     this.handSequence++;this.regionalHintCache=undefined;
+    this.mcrWaitCache.clear();this.handHintCache.clear();
     const points=this.players.map(p=>p.points);
     if(this.options.matchLength==='endless'){
       this.checkpoint={version:1,sessionId:this.endlessSessionId,sequence:this.handSequence,points:[...points],dealer:this.dealer,rotation:this.roundNumber,honba:this.honba,sticks:this.sticks};
@@ -180,31 +212,101 @@ export class RegionalSession implements GameSessionAPI {
       if(selfDraw&&player.id===this.dealer&&this.players.every(p=>p.discards.length===0))heavenlyWin='heaven';
       else if((selfDraw&&player.id!==this.dealer&&player.discards.length===0)||(!selfDraw&&event?.firstDealerDiscard))heavenlyWin='earth';
     }
-    return {profile:this.profile,player,selfDraw,winningTile,seat:this.seat(player.id),roundWind:Math.floor(this.roundNumber/this.profile.players)%4,wildcard:this.wildcard,lastTile:this.wall.length===0,kongDraw:selfDraw&&player.lastDrawKan,robbingKong,dora:this.dora,ura:withUra?this.ura:[],visibleWinningCopies:shown,firstDraw:!this.callsMade&&player.discards.length===0,sichuan:this.sichuanOptions,kongDiscard:event?.kongDiscard,heavenlyWin};
+    return {profile:this.profile,rulesVersion:this.rulesVersion,player,selfDraw,winningTile,seat:this.seat(player.id),roundWind:Math.floor(this.roundNumber/this.profile.players)%4,wildcard:this.wildcard,lastTile:this.wall.length===0,kongDraw:selfDraw&&player.lastDrawKan,robbingKong,dora:this.dora,ura:withUra?this.ura:[],visibleWinningCopies:shown,firstDraw:!this.callsMade&&player.discards.length===0,sichuan:this.sichuanOptions,kongDiscard:event?.kongDiscard,heavenlyWin};
   }
   private winning(player:Player,tile:string,selfDraw:boolean,robbing=false,withUra=false,reasons?:string[],event?:ResponseEvent){return scoreHand(this.context(player,tile,selfDraw,robbing,withUra,event),reasons);}
   private tileUniverse(){return [...new Set(profileTiles(this.profile).filter(t=>t[0]!=='f').map(norm))];}
-  private shapeWaits(player:Player,tiles=player.hand,melds=player.melds):string[]{
-    if(tiles.length%3!==1)return [];
-    return this.tileUniverse().filter(tile=>{
-      if(tiles.filter(t=>norm(t)===tile).length+melds.flatMap(m=>m.tiles).filter(t=>norm(t)===tile).length>=4)return false;
-      return decompose([...tiles,tile],melds,this.profile.sets,this.wildcard).some(f=>(!f.sevenPairs||this.profile.sevenPairs)&&(!f.orphans||this.profile.orphans));
+  private mcrShapeWaits(tiles: readonly string[], melds: readonly MeldView[]): string[] {
+    if (tiles.length % 3 !== 1) return [];
+    const key = JSON.stringify([tiles, melds]);
+    const cached = this.mcrWaitCache.get(key);
+    if (cached) return [...cached];
+    const counts = countsOf([...tiles, ...melds.flatMap(meld => meld.tiles)]);
+    const waits = this.tileUniverse().filter(tile => counts[tileIndex(tile)] < 4 && isMcrWinningShape(tiles, melds, tile));
+    if (this.mcrWaitCache.size >= 256) this.mcrWaitCache.clear();
+    this.mcrWaitCache.set(key, waits);
+    return [...waits];
+  }
+  private shapeWaits(player: Player, tiles = player.hand, melds = player.melds): string[] {
+    if (tiles.length % 3 !== 1) return [];
+    if (this.profile.id === 'mcr' && this.rulesVersion >= 2) return this.mcrShapeWaits(tiles, melds);
+    return this.tileUniverse().filter(tile => {
+      if (tiles.filter(held => norm(held) === tile).length + melds.flatMap(meld => meld.tiles).filter(held => norm(held) === tile).length >= 4) return false;
+      return decompose([...tiles, tile], melds, this.profile.sets, this.wildcard)
+        .some(form => (!form.sevenPairs || this.profile.sevenPairs) && (!form.orphans || this.profile.orphans));
     });
+  }
+  private publicTileCounts(): number[] {
+    return countsOf(this.players.flatMap(player => [
+      ...player.discards.filter(discard => !discard.called).map(discard => discard.tile),
+      ...player.melds.flatMap(meld => meld.tiles),
+    ]));
+  }
+  private handHint(player: Player, tiles: string[], melds = player.melds, discardedTile?: string): RegionalHandHint {
+    const publicCounts = this.publicTileCounts();
+    if (discardedTile) publicCounts[tileIndex(discardedTile)]++;
+    let candidate = player;
+    if (discardedTile && this.profile.id === 'hangzhou') {
+      const burstReady = isBurstReady(tiles, melds, this.wildcard);
+      let floatCount = burstReady ? player.floatCount : 0;
+      if (burstReady && norm(discardedTile) === this.wildcard) floatCount = Math.min(3, player.floatCount + 1);
+      candidate = { ...player, floatCount };
+    }
+    const key = JSON.stringify([this.profile.id, this.rulesVersion, tiles, melds, player.flowers, player.voidSuit,
+      candidate.floatCount, this.seat(player.id), Math.floor(this.roundNumber / this.profile.players) % 4,
+      this.wildcard, this.sichuanOptions, publicCounts]);
+    const cached = this.handHintCache.get(key);
+    if (cached) return structuredClone(cached);
+    const waits = this.profile.id === 'mcr' ? this.mcrShapeWaits(tiles, melds) : this.shapeWaits(player, tiles, melds);
+    const distance = waits.length ? 0 : this.distance(tiles, melds);
+    const waitDetails = waits.map(tile => this.waitEligibility(candidate, tiles, melds, tile, publicCounts[tileIndex(tile)]));
+    const hint = { shanten: Number.isFinite(distance) ? distance : null, waits, waitDetails };
+    if (this.handHintCache.size >= 128) this.handHintCache.clear();
+    this.handHintCache.set(key, hint);
+    return structuredClone(hint);
+  }
+  private waitEligibility(player: Player, tiles: string[], melds: MeldView[], tile: string, visibleCopies: number): RegionalWaitView {
+    const candidate = { ...player, hand: [...tiles], melds, drawn: null };
+    const ordinary = {
+      ...this.context(candidate, tile, false),
+      lastTile: false,
+      kongDraw: false,
+      robbingKong: false,
+      kongDiscard: false,
+      firstDraw: false,
+      heavenlyWin: undefined,
+      visibleWinningCopies: visibleCopies,
+      ura: [],
+    };
+    const ronReasons: string[] = [], tsumoReasons: string[] = [];
+    const ronScore = scoreHand(ordinary, ronReasons);
+    const tsumoContext = { ...ordinary, selfDraw: true, player: { ...candidate, hand: [...tiles, tile] } };
+    const tsumoScore = scoreHand(tsumoContext, tsumoReasons);
+    const ron = !!ronScore, tsumo = !!tsumoScore;
+    const reasons = [...new Set(ron ? [] : tsumo ? ronReasons : [...ronReasons, ...tsumoReasons])];
+    let status: RegionalWaitView['status'] = 'blocked';
+    if (ron) status = 'ron';
+    else if (tsumo) status = 'tsumo';
+    else if (reasons.some(reason => /不足|番数|无役/.test(reason))) status = 'insufficient';
+    const ronFan = ronScore?.fan ?? (this.profile.id === 'mcr' ? evaluateMcrHand(ordinary)?.fan : undefined);
+    const tsumoFan = tsumoScore?.fan ?? (this.profile.id === 'mcr' ? evaluateMcrHand(tsumoContext)?.fan : undefined);
+    return { tile, ron, tsumo, status, reasons,
+      ...(ronFan === undefined ? {} : { ronFan }), ...(tsumoFan === undefined ? {} : { tsumoFan }) };
   }
   private isFuriten(player:Player){return player.temporaryFuriten||player.permanentFuriten||this.shapeWaits(player).some(tile=>player.discards.some(d=>norm(d.tile)===tile));}
   private handId(id:number,index:number){return `${id}-tile-${index}`;}
-  getRegionalHint(discardId:string):{shanten:number|null;waits:string[]}|null{
-    if(this.disposed||this.profile.id==='sanma'||this.stage!=='discard'||this.turn!==0)return null;
-    const player=this.players[0];
-    if(player.hasWon&&this.profile.continuing==='blood')return null;
-    const choice=this.actions.find(action=>action.type==='discard'&&action.tileId===discardId);
-    if(choice?.index==null||choice.index<0||choice.index>=player.hand.length)return null;
-    const key=JSON.stringify([this.profile.id,this.wildcard,player.hand,player.melds,choice.index]);
-    if(this.regionalHintCache?.key===key)return {shanten:this.regionalHintCache.shanten,waits:[...this.regionalHintCache.waits]};
-    const after=player.hand.filter((_,index)=>index!==choice.index),distance=this.distance(after,player.melds);
-    const hint={key,shanten:Number.isFinite(distance)?distance:null,waits:distance===0?this.shapeWaits(player,after):[]};
-    this.regionalHintCache=hint;
-    return {shanten:hint.shanten,waits:[...hint.waits]};
+  getRegionalHint(discardId: string): RegionalHandHint | null {
+    if (this.disposed || this.profile.id === 'sanma' || this.stage !== 'discard' || this.turn !== 0) return null;
+    const player = this.players[0];
+    if (player.hasWon && this.profile.continuing === 'blood') return null;
+    const choice = this.actions.find(action => action.type === 'discard' && action.tileId === discardId);
+    if (choice?.index == null || choice.index < 0 || choice.index >= player.hand.length) return null;
+    const key = JSON.stringify([this.revision, player.hand, player.melds, choice.index]);
+    if (this.regionalHintCache?.key === key) return structuredClone(this.regionalHintCache.hint);
+    const after = player.hand.filter((_, index) => index !== choice.index);
+    const hint = this.handHint(player, after, player.melds, choice.tile);
+    this.regionalHintCache = { key, hint };
+    return structuredClone(hint);
   }
   private ownChoices(player:Player):Choice[]{
     const choices:Choice[]=[];const drawn=player.drawn;
@@ -217,7 +319,7 @@ export class RegionalSession implements GameSessionAPI {
     }
     if(this.profile.id==='sanma'&&drawn&&this.wall.length&&player.hand.some(t=>t==='z4')&&(!player.riichi||drawn==='z4'))choices.push(this.action('kita','kita','拔北',{tile:'z4'}));
     const mustVoid=!!player.voidSuit&&player.hand.some(t=>t[0]===player.voidSuit);
-    const canKong=this.sichuanOptions?.version===2||this.kanCount<4;
+    const canKong=this.canDeclareKong();
     if(drawn&&this.wall.length>0&&(!mustVoid)&&canKong){
       for(const tile of new Set(player.hand.map(norm))){
         if(this.wildcard&&tile===this.wildcard)continue;
@@ -251,7 +353,7 @@ export class RegionalSession implements GameSessionAPI {
     if(event.kind==='discard'&&this.wall.length>0&&!player.riichi&&(!player.voidSuit||!player.hand.some(t=>t[0]===player.voidSuit))&&(!this.wildcard||norm(tile)!==this.wildcard)){
       const matches=player.hand.filter(t=>norm(t)===norm(tile));
       if(matches.length>=2)choices.push(this.action('pon',`pon:${tile}`,`碰${tileLabel(tile)}`,{tile,consume:matches.slice(0,2),tiles:[...matches.slice(0,2),tile]}));
-      if(matches.length>=3&&this.wall.length&&(this.sichuanOptions?.version===2||this.kanCount<4))choices.push(this.action('kan',`kan-open:${tile}`,`杠${tileLabel(tile)}`,{tile,consume:matches.slice(0,3),tiles:[...matches.slice(0,3),tile],kind:'open'}));
+      if(matches.length>=3&&this.wall.length&&this.canDeclareKong())choices.push(this.action('kan',`kan-open:${tile}`,`杠${tileLabel(tile)}`,{tile,consume:matches.slice(0,3),tiles:[...matches.slice(0,3),tile],kind:'open'}));
       if(this.profile.chi&&player.id===(from+1)%this.profile.players&&tile[0]!=='z'){
         const rank=Number(norm(tile)[1]);for(let start=rank-2;start<=rank;start++){
           if(start<1||start>7)continue;const wanted=[start,start+1,start+2].filter(n=>n!==rank).map(n=>tile[0]+n),consume:string[]=[];let valid=true;
@@ -274,9 +376,13 @@ export class RegionalSession implements GameSessionAPI {
         if(choices.some(choice=>choice.type==='ron'))this.ronNotice=undefined;
         else if(reasons.length)this.ronNotice={id:`regional:${this.displaySessionId}:ron:${++this.ronEventSequence}`,tile,fromId:from,event:kind==='kan'?'addedKan':'discard',active:choices.length>0,reasons};
       }
-      if(choices.length){event.choices.set(player.id,choices);if(player.id!==0)event.replies.set(player.id,this.botChoice(player,choices));}
+      if(choices.length){
+        event.choices.set(player.id,choices);
+        if(player.id!==0&&!this.useDecisionWorker(player,choices))event.replies.set(player.id,this.botChoice(player,choices));
+      }
     }
     this.response=event;this.stage='response';this.actions=event.choices.get(0)||[];
+    this.prepareResponseBots(event);
   }
   private remove(player:Player,tiles:string[]){for(const tile of tiles){const index=player.hand.indexOf(tile);if(index<0)throw new Error('副露牌不在手中');player.hand.splice(index,1);}}
   private execute(player:Player,choice:Choice){
@@ -303,6 +409,12 @@ export class RegionalSession implements GameSessionAPI {
   }
   private acceptRiichi(event:ResponseEvent){if(!event.riichi)return;const player=this.players[event.from];player.riichi=true;player.doubleRiichi=player.discards.length===1&&!this.callsMade;player.ippatsu=true;player.points-=1000;this.sticks++;}
   private resolve(){
+    if(this.response&&this.missingResponseBots(this.response))return;
+    if(this.response?.pendingHuman){
+      this.record(this.response.pendingHuman.key);
+      this.step++;
+      delete this.response.pendingHuman;
+    }
     if(this.ronNotice)this.ronNotice.active=false;
     const event=this.response!;const replies=[...event.replies].sort((a,b)=>(a[0]-event.from+this.profile.players)%this.profile.players-(b[0]-event.from+this.profile.players)%this.profile.players);
     for(const [id,choices]of event.choices){if(this.profile.id==='sanma'&&choices.some(c=>c.type==='ron')&&event.replies.get(id)?.type!=='ron'){this.players[id].temporaryFuriten=true;if(this.players[id].riichi)this.players[id].permanentFuriten=true;}}
@@ -408,10 +520,133 @@ export class RegionalSession implements GameSessionAPI {
       this.stage='match';this.actions=[];this.result={kind:'match',title:'对局结束',description:`${NAMES[order[0].id]}获得第一名`,winners:[],deltas:Array(this.profile.players).fill(0),scores:this.players.map(p=>p.points),ranks:this.players.map(p=>order.findIndex(x=>x.id===p.id)+1)};
     }else this.deal();
   }
-  private observation(player:Player):BotObservation{
-    return {ownId:player.id,seat:this.seat(player.id),roundWind:Math.floor(this.roundNumber/this.profile.players)%4,roundHand:this.roundNumber%this.profile.players+1,finalRound:this.options.matchLength!=='endless'&&this.roundNumber>=(this.options.matchLength==='hanchan'?2:1)*this.profile.players-1,playerCount:this.profile.players,ownHand:coreString(player.hand,player.melds,player.drawn||undefined),doraIndicators:this.profile.id==='sanma'?this.dora:[],additionalPublicTiles:[...this.players.flatMap(p=>Array(p.kita).fill('z4')),...(this.profile.id==='sanma'?[]:this.dora)],tilesLeft:this.wall.length,honba:this.honba,riichiSticks:this.sticks,players:this.players.map(p=>({id:p.id,seat:this.seat(p.id),points:p.points,dealer:p.id===this.dealer,riichi:p.riichi,melds:p.melds.map(coreMeld),discards:p.discards.map(d=>({...d}))})),allowOpenTanyao:true,seed:`public:${player.hand.join('')}:${this.players.map(p=>p.discards.map(d=>d.tile).join('')).join('/')}:${this.wall.length}`,discardFuriten:this.profile.id==='sanma',tileLimits:countsOf(profileTiles(this.profile)),wildcards:this.wildcard?[this.wildcard]:[],pointScale:this.profile.id==='sanma'?1:.001,expectedDealInValue:this.profile.id==='sanma'?5200:8,dealerValueMultiplier:this.profile.id==='sanma'?1.5:1};
+  private observation(player: Player): BotObservation {
+    const currentStrategy = this.effectiveAiVersion(player) >= 5;
+    const isActive = (opponent: Player) => !opponent.hasWon || this.profile.continuing !== 'blood';
+    return {
+      ownId: player.id,
+      seat: this.seat(player.id),
+      roundWind: Math.floor(this.roundNumber / this.profile.players) % 4,
+      roundHand: this.roundNumber % this.profile.players + 1,
+      finalRound: this.options.matchLength !== 'endless' && this.roundNumber >= (this.options.matchLength === 'hanchan' ? 2 : 1) * this.profile.players - 1,
+      playerCount: this.profile.players,
+      ...(currentStrategy ? { activePlayerCount: this.players.filter(isActive).length } : {}),
+      ownHand: coreString(player.hand, player.melds, player.drawn || undefined),
+      doraIndicators: this.profile.id === 'sanma' ? this.dora : [],
+      additionalPublicTiles: [...this.players.flatMap(opponent => Array(opponent.kita).fill('z4')), ...(this.profile.id === 'sanma' ? [] : this.dora)],
+      tilesLeft: this.wall.length,
+      honba: this.honba,
+      riichiSticks: this.sticks,
+      players: this.players.map(opponent => ({
+        id: opponent.id, seat: this.seat(opponent.id), points: opponent.points,
+        dealer: opponent.id === this.dealer, riichi: opponent.riichi,
+        ...(currentStrategy ? { active: isActive(opponent), voidSuit: opponent.voidSuit } : {}),
+        melds: opponent.melds.map(coreMeld), discards: opponent.discards.map(discard => ({ ...discard })),
+      })),
+      allowOpenTanyao: true,
+      seed: 'public:' + player.hand.join('') + ':' + this.players.map(opponent => opponent.discards.map(discard => discard.tile).join('')).join('/') + ':' + this.wall.length,
+      discardFuriten: this.profile.id === 'sanma',
+      tileLimits: countsOf(profileTiles(this.profile)),
+      wildcards: this.wildcard ? [this.wildcard] : [],
+      pointScale: this.profile.id === 'sanma' ? 1 : .001,
+      expectedDealInValue: this.profile.id === 'sanma' ? 5200 : 8,
+      dealerValueMultiplier: this.profile.id === 'sanma' ? 1.5 : 1,
+    };
+  }
+  private regionalBotInput(player: Player, choices: Choice[]): RegionalBotInput {
+    return {
+      observation: structuredClone(this.observation(player)),
+      player: {
+        hand: [...player.hand],
+        melds: player.melds.map(meld => ({ ...meld, tiles: [...meld.tiles] })),
+        flowers: [...player.flowers],
+        voidSuit: player.voidSuit,
+        riichi: player.riichi,
+        doubleRiichi: player.doubleRiichi,
+        ippatsu: player.ippatsu,
+        kita: player.kita,
+        floatCount: player.floatCount,
+      },
+      profile: structuredClone(this.profile),
+      actions: choices.map(choice => ({
+        key: choice.key, type: choice.type, tile: choice.tile,
+        tiles: choice.tiles ? [...choice.tiles] : undefined,
+        consume: choice.consume ? [...choice.consume] : undefined,
+        index: choice.index, meldIndex: choice.meldIndex, kind: choice.kind,
+      })),
+      difficulty: player.id === 0 ? this.options.autoPlayDifficulty : this.options.difficulty,
+      drawn: player.drawn,
+      wildcard: this.wildcard,
+      sichuan: this.sichuanOptions ? { ...this.sichuanOptions } : undefined,
+      rulesVersion: this.rulesVersion,
+    };
+  }
+  private decisionStateKey(input: RegionalBotInput): string {
+    return JSON.stringify([this.stage, this.turn, this.response?.kind, this.response?.from, this.response?.tile, input]);
+  }
+  private useDecisionWorker(player: Player, choices: Choice[] = []): boolean {
+    return !this.replaying && this.effectiveAiVersion(player) >= 5 && this.decisionService.available
+      && !choices.some(choice => choice.type === 'ron' || choice.type === 'tsumo' || choice.type === 'kita');
+  }
+  private queueDecision(player: Player, choices: Choice[], receive: (choice: Choice, key: string) => void): void {
+    const input = this.regionalBotInput(player, choices);
+    const key = this.decisionStateKey(input);
+    if (this.pendingDecisions.has(key)) return;
+    const generation = this.decisionGeneration, step = this.step, stage = this.stage, turn = this.turn;
+    this.pendingDecisions.add(key);
+    void this.decisionService.choose(input).then(decision => {
+      if(generation!==this.decisionGeneration)return;
+      this.pendingDecisions.delete(key);
+      if (!decision || this.disposed || step !== this.step || stage !== this.stage || turn !== this.turn) return;
+      const choice = choices.find(action => action.key === decision.key);
+      if (choice) receive(choice, key);
+    });
+  }
+  private prepareTurnDecision(player: Player, choices: Choice[]): boolean {
+    if (!this.useDecisionWorker(player, choices)) return true;
+    const key = this.decisionStateKey(this.regionalBotInput(player, choices));
+    if (this.decisionCache.has(key)) return true;
+    this.queueDecision(player, choices, (choice, stateKey) => {
+      this.decisionCache.set(stateKey, choice.key);
+      this.schedule();
+    });
+    return false;
+  }
+  private missingResponseBots(event: ResponseEvent): boolean {
+    return [...event.choices.keys()].some(id => id !== 0 && !event.replies.has(id));
+  }
+  private prepareResponseBots(event: ResponseEvent): void {
+    for (const [id, choices] of event.choices) {
+      if (id === 0 || event.replies.has(id)) continue;
+      const player = this.players[id];
+      if (!this.useDecisionWorker(player, choices)) {
+        event.replies.set(id, this.botChoice(player, choices));
+        continue;
+      }
+      this.queueDecision(player, choices, choice => {
+        if (this.response !== event || this.stage !== 'response' || event.replies.has(id)) return;
+        event.replies.set(id, choice);
+        this.finishPreparedResponse(event);
+        this.schedule();
+      });
+    }
+    this.finishPreparedResponse(event);
+  }
+  private finishPreparedResponse(event: ResponseEvent): void {
+    if (this.response !== event || this.missingResponseBots(event) || !event.choices.has(0) || !event.replies.has(0)) return;
+    // The submitted response and the ready computer replies commit as one transition.
+    this.resolve();
+    this.publish();
   }
   private botChoice(player:Player,choices:Choice[]):Choice{
+    if(this.effectiveAiVersion(player)>=5){
+      const input=this.regionalBotInput(player,choices);
+      const cacheKey=this.decisionStateKey(input);
+      const cached=this.decisionCache.get(cacheKey);
+      this.decisionCache.delete(cacheKey);
+      const key=cached??chooseRegionalAction(input).key;
+      return choices.find(choice=>choice.key===key)||choices[0];
+    }
     const difficulty=player.id===0?this.options.autoPlayDifficulty:this.options.difficulty;
     // Every physical copy remains selectable by the human. The AI retains its
     // original canonical candidate set, including the separate actual drawn tile.
@@ -525,17 +760,32 @@ export class RegionalSession implements GameSessionAPI {
     return (this.stage==='void'||this.stage==='discard'&&this.turn===0||this.stage==='response'&&this.actions.length>0&&!this.response?.replies.has(0))&&!this.options.autoPlay&&!this.quickChoice();
   }
   private schedule(){
-    if(this.replaying||this.disposed||this.timer!==null||this.stage==='settlement'||this.stage==='match'||this.waitingForHuman())return;
+    if(this.replaying||this.disposed||this.timer!==null||this.stage==='settlement'||this.stage==='match')return;
+    if(this.stage==='response'&&this.response)this.prepareResponseBots(this.response);
+    if(this.waitingForHuman())return;
+    if(this.stage==='response'&&this.response&&this.missingResponseBots(this.response))return;
+    if(this.stage==='discard'){
+      const quick=this.turn===0&&!this.options.autoPlay?this.quickChoice():undefined;
+      if(!quick&&!this.prepareTurnDecision(this.players[this.turn],this.actions))return;
+    }else if(this.stage==='response'&&this.response&&this.actions.length&&!this.response.replies.has(0)){
+      const quick=!this.options.autoPlay?this.quickChoice():undefined;
+      if(!quick&&!this.prepareTurnDecision(this.players[0],this.actions))return;
+    }
     this.timer=setTimeout(()=>{this.timer=null;this.tick();this.schedule();},this.options.speed);
   }
   dispatch(actionId:string):boolean{
-    const choice=this.actions.find(c=>c.id===actionId);if(!choice||this.disposed)return false;this.cancel();
+    const choice=this.actions.find(c=>c.id===actionId);if(!choice||this.disposed||this.stage==='response'&&this.response?.replies.has(0))return false;this.cancel();
     if(this.stage==='exchange'){
       if(choice.type==='exchange'){if(this.exchangeSelection.has(choice.index!))this.exchangeSelection.delete(choice.index!);else if(this.exchangeSelection.size<3)this.exchangeSelection.add(choice.index!);this.exchangeActions();}
       else{this.record(`exchange-auto:${[...this.exchangeSelection].join(',')}`);this.step++;this.exchange();}
     }else if(this.stage==='void'){this.record(choice.key);this.step++;this.declareVoid(choice.tile!);}
     else if(this.stage==='settlement'){this.record('next');this.step++;this.continueRound();}
-    else if(this.stage==='response'){this.record(choice.key);this.step++;this.response!.replies.set(0,choice);this.resolve();}
+    else if(this.stage==='response'){
+      this.response!.replies.set(0,choice);
+      if(this.missingResponseBots(this.response!))this.response!.pendingHuman=choice;
+      else{this.record(choice.key);this.step++;}
+      this.resolve();
+    }
     else if(this.stage==='discard'&&this.turn===0){this.record(choice.key);this.step++;this.execute(this.players[0],choice);}
     else return false;
     this.publish();this.schedule();return true;
@@ -547,12 +797,20 @@ export class RegionalSession implements GameSessionAPI {
   setSpeed(milliseconds:number){this.options.speed=Math.max(0,Math.min(3000,Number.isFinite(milliseconds)?milliseconds:450));this.cancel();this.publish();this.schedule();}
   private publish(){
     if(this.replaying&&!this.replayFrames)return;
-    const humanActions=this.stage==='discard'&&this.turn!==0?[]:this.actions;
+    const responseSubmitted=this.stage==='response'&&this.response?.replies.has(0);
+    const humanActions=this.stage==='discard'&&this.turn!==0||responseSubmitted?[]:this.actions;
     const human=this.players[0],distance=this.distance(human.hand,human.melds);
     this.snapshot={status:this.stage==='match'?'matchEnd':this.stage==='settlement'?'roundEnd':'playing',phase:this.stage==='exchange'?'exchange':this.stage==='void'?'void':this.stage==='settlement'||this.stage==='match'?'settlement':this.stage==='discard'&&this.turn===0?'discard':this.stage==='response'&&humanActions.length?'response':'waiting',seed:this.options.seed,players:this.players.map(player=>({id:player.id,name:NAMES[player.id],wind:WINDS[this.seat(player.id)],points:player.points,dealer:player.id===this.dealer,riichi:player.riichi,isHuman:player.id===0,hand:player.id===0?player.hand.map((tile,index)=>({id:this.handId(player.id,index),tile,label:tileLabel(tile),drawn:!!player.drawn&&index===player.hand.length-1})):[],concealedCount:player.hand.length,discards:player.discards.map(d=>({...d})),melds:player.melds.map(m=>({...m,tiles:[...m.tiles]})),flowers:[...player.flowers],kita:player.kita,voidSuit:player.voidSuit,hasWon:player.hasWon,winCount:player.winCount,...(this.stage==='settlement'&&this.roundWinners.some(w=>w.playerId===player.id)?{revealedHand:[...this.roundWinners.filter(win=>win.playerId===player.id).at(-1)!.hand]}:{})})),round:{wind:WINDS[Math.floor(this.roundNumber/this.profile.players)%4],hand:this.roundNumber%this.profile.players+1,honba:this.honba,riichiSticks:this.sticks,tilesLeft:this.wall.length,doraIndicators:[...this.dora],uraIndicators:this.stage==='settlement'&&this.roundWinners.some(w=>this.players[w.playerId].riichi)?[...this.ura]:[],dealer:this.dealer,wildcard:this.wildcard},turn:this.turn,humanId:0,actions:humanActions.map(({key:_key,index:_index,consume:_consume,kind:_kind,meldIndex:_meldIndex,...action})=>action),message:this.stage==='exchange'?'选择三张同花色的牌交换':this.stage==='void'?'请选择本局定缺花色':this.stage==='settlement'?this.result?.title||'本局结束':this.stage==='match'?'对局结束':this.stage==='discard'&&this.turn===0?'轮到你了 · 选择一张牌打出':this.stage==='response'&&humanActions.length?'请选择和牌、鸣牌或跳过':`${NAMES[this.turn]}正在思考…`,log:[...this.logs],result:this.result?structuredClone(this.result):null,...(this.latestWin?{latestWin:structuredClone(this.latestWin)}:{}),autoPlay:this.options.autoPlay,speed:this.options.speed,revision:++this.revision,shanten:distance,waits:distance===0?this.shapeWaits(human):[],mode:this.profile.id,modeName:getMode(this.profile.id).name,difficulty:this.options.difficulty,playerCount:this.profile.players,handSize:this.profile.sets*3+1,scoreUnit:this.profile.id==='sanma'?'点':'分',setupSelection:[...this.exchangeSelection].map(i=>this.handId(0,i)),ruleSummary:[...this.profile.summary]};
     if(this.options.matchLength==='endless')this.snapshot.round.sequence=this.handSequence;
     if(this.sichuanOptions){this.snapshot.sichuanOptions={...this.sichuanOptions};this.snapshot.ruleSummary=[...this.profile.summary,...sichuanRuleSummary(this.sichuanOptions)];}
+    if (this.profile.id !== 'sanma') {
+      const hint = this.handHint(human, human.hand);
+      this.snapshot.regionalAssist = hint;
+      this.snapshot.shanten = hint.shanten;
+      this.snapshot.waits = [...hint.waits];
+    }
     if(this.profile.id==='sanma')this.snapshot.riichiAssist=this.calculateAssist(projectRiichiAssist(this.snapshot),{temporary:human.temporaryFuriten,riichiPass:human.permanentFuriten});
+    this.snapshot.rulesVersion=this.rulesVersion;
     this.snapshot.quickControls={...this.quickControls};
     this.snapshot.autoPlayDifficulty=this.options.autoPlayDifficulty;
     this.snapshot.autoExchangeThree=this.options.autoExchangeThree;
@@ -563,7 +821,7 @@ export class RegionalSession implements GameSessionAPI {
     if(this.replaying)return;
     for(const listener of this.listeners)listener();
   }
-  getSavedGame():SavedGame{return {version:1,seed:this.options.seed,matchLength:this.options.matchLength,mode:this.profile.id,difficulty:this.options.difficulty,startPoints:this.options.startPoints,autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:this.options.autoExchangeThree,aiVersion:this.aiVersion,replayPosition:this.step,variantOptions:this.options.variantOptions?structuredClone(this.options.variantOptions):undefined,decisions:this.decisions.map(d=>({...d})),...(this.checkpoint?{checkpoint:structuredClone(this.checkpoint)}:{})};}
+  getSavedGame():SavedGame{return {version:1,seed:this.options.seed,matchLength:this.options.matchLength,mode:this.profile.id,difficulty:this.options.difficulty,startPoints:this.options.startPoints,autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:this.options.autoExchangeThree,aiVersion:this.aiVersion,rulesVersion:this.rulesVersion,replayPosition:this.step,variantOptions:this.options.variantOptions?structuredClone(this.options.variantOptions):undefined,decisions:this.decisions.map(d=>({...d})),...(this.checkpoint?{checkpoint:structuredClone(this.checkpoint)}:{})};}
   exportReplay():ReplayData{return {...this.getSavedGame(),rules:{mode:this.profile.id,version:this.sichuanOptions?`${getMode(this.profile.id).name} v${this.sichuanOptions.version}`:getMode(this.profile.id).ruleVersion,summary:this.sichuanOptions?[...this.profile.summary,...sichuanRuleSummary(this.sichuanOptions)]:this.profile.summary},log:this.logs.map(l=>({...l}))};}
   loadSavedGame(data:SavedGame):boolean{
     if(!data||data.version!==1||data.mode!==this.profile.id||typeof data.seed!=='string'||!Array.isArray(data.decisions)||data.decisions.length>20000||!data.decisions.every(d=>typeof d?.key==='string')||data.difficulty&&!validDifficulty(data.difficulty))return false;
@@ -571,7 +829,7 @@ export class RegionalSession implements GameSessionAPI {
     const previous=this.getSavedGame();
     const restore=(save:SavedGame)=>{
       this.aiVersion=save.aiVersion??2;
-      this.replaying=true;this.initialize({seed:save.seed,mode:save.mode,difficulty:save.difficulty||'standard',startPoints:restoredStartPoints(save),autoPlayDifficulty:save.autoPlayDifficulty??'expert',autoExchangeThree:save.autoExchangeThree??false,variantOptions:save.variantOptions,matchLength:save.matchLength,autoPlay:false,quickControls:DEFAULT_QUICK_CONTROLS},save.checkpoint);let cursor=0;
+      this.replaying=true;this.initialize({seed:save.seed,mode:save.mode,difficulty:save.difficulty||'standard',startPoints:restoredStartPoints(save),autoPlayDifficulty:save.autoPlayDifficulty??'expert',autoExchangeThree:save.autoExchangeThree??false,rulesVersion:save.rulesVersion??1,variantOptions:save.variantOptions,matchLength:save.matchLength,autoPlay:false,quickControls:DEFAULT_QUICK_CONTROLS},save.checkpoint);let cursor=0;
       for(let guard=0;guard<100000;guard++){
         if(save.replayPosition!=null&&this.step>=save.replayPosition&&cursor===save.decisions.length)break;
         if(save.replayPosition!=null&&this.step>save.replayPosition)return false;
@@ -590,7 +848,7 @@ export class RegionalSession implements GameSessionAPI {
   /** Used only on a disposable session; never emits reconstructed live events. */
   async captureReplayFrames(data:SavedGame):Promise<ReplayFrame[]>{
     validateReplayData(data);this.cancel();this.replaying=true;this.replayFrames=[];this.aiVersion=data.aiVersion??2;
-    this.initialize({seed:data.seed,mode:data.mode,difficulty:data.difficulty||'standard',startPoints:restoredStartPoints(data),autoPlayDifficulty:data.autoPlayDifficulty??'expert',autoExchangeThree:data.autoExchangeThree??false,variantOptions:data.variantOptions,matchLength:data.matchLength,autoPlay:false,speed:0,quickControls:DEFAULT_QUICK_CONTROLS},data.checkpoint);
+    this.initialize({seed:data.seed,mode:data.mode,difficulty:data.difficulty||'standard',startPoints:restoredStartPoints(data),autoPlayDifficulty:data.autoPlayDifficulty??'expert',autoExchangeThree:data.autoExchangeThree??false,rulesVersion:data.rulesVersion??1,variantOptions:data.variantOptions,matchLength:data.matchLength,autoPlay:false,speed:0,quickControls:DEFAULT_QUICK_CONTROLS},data.checkpoint);
     let cursor=0;
     for(let guard=0;guard<MAX_REPLAY_STEPS;guard++){
       const exactEnd=data.replayPosition!=null;

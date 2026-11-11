@@ -28,7 +28,7 @@ const validEndlessHistory = (value: unknown): boolean => {
 };
 const position = (save: SavedGame) => (save as SavedGame & { replayPosition?: number }).replayPosition ?? save.decisions.length;
 const configKey = (save: SavedGame) => {
-  const parts = [save.mode ?? 'riichi', save.seed, save.matchLength, save.difficulty ?? 'standard', save.aiVersion ?? 1, save.variantOptions?.exchangeThree ?? false, save.variantOptions?.minimumFan ?? null];
+  const parts = [save.mode ?? 'riichi', save.seed, save.matchLength, save.difficulty ?? 'standard', save.aiVersion ?? (save.mode == null || save.mode === 'riichi' ? 1 : 2), save.variantOptions?.exchangeThree ?? false, save.variantOptions?.minimumFan ?? null];
   const starting = restoredStartPoints(save);
   // Keep historical resumeSession identities, including deleted old replays.
   if (starting !== restoredStartPoints({ mode: save.mode })) parts.push(starting);
@@ -37,12 +37,25 @@ const configKey = (save: SavedGame) => {
     const rules = normalizeSichuanOptions(save.variantOptions.sichuan);
     if (rules.version !== 1) parts.push('sichuan', rules.version, rules.fanCap, rules.selfDraw, rules.menqingZhongzhang);
   }
+  if (save.mode !== 'riichi' && save.mode != null && save.rulesVersion === 2) parts.push('rules', 2);
   if (save.matchLength === 'endless' && save.checkpoint) {
     const cp = save.checkpoint;
     parts.push('checkpoint', cp.sessionId, cp.sequence, cp.dealer, cp.rotation, cp.honba, cp.sticks, ...cp.points);
   }
   return JSON.stringify(parts);
 };
+/** Older regional games used the same engine version before recording it explicitly. */
+function migrateResumeConfig(config: string): string {
+  try {
+    const parts: unknown = JSON.parse(config);
+    if (Array.isArray(parts) && parts.length >= 7 && parts[0] !== 'riichi'
+      && MODES.some(mode => mode.id === parts[0]) && parts[4] === 1) {
+      parts[4] = 2;
+      return JSON.stringify(parts);
+    }
+  } catch { /* Preserve an unrecognized historical identity. */ }
+  return config;
+}
 const endlessHandId = (save: SavedGame) => save.matchLength === 'endless' && save.checkpoint
   ? `endless-hand:${JSON.stringify([save.checkpoint.sessionId, save.checkpoint.sequence])}` : undefined;
 const endlessHistoryId = (sessionId: string) => `endless-history:${JSON.stringify(sessionId)}`;
@@ -63,6 +76,7 @@ export function validateSavedGame(value: unknown): SavedGame {
   if (value.difficulty != null && !['novice', 'standard', 'advanced', 'expert'].includes(String(value.difficulty))) throw new Error('牌谱的电脑难度无效。');
   if (value.autoPlayDifficulty !== undefined && (typeof value.autoPlayDifficulty !== 'string' || !['novice', 'standard', 'advanced', 'expert'].includes(value.autoPlayDifficulty))) throw new Error('牌谱的托管难度无效。');
   if (value.autoExchangeThree !== undefined && typeof value.autoExchangeThree !== 'boolean') throw new Error('牌谱的托管换三张设置无效。');
+  if (value.rulesVersion !== undefined && value.rulesVersion !== 1 && value.rulesVersion !== 2) throw new Error('牌谱的规则版本无效。');
   if (value.aiVersion != null && (!Number.isInteger(value.aiVersion) || Number(value.aiVersion) < 1 || Number(value.aiVersion) > 100)) throw new Error('牌谱的电脑版本无效。');
   if (!Array.isArray(value.decisions) || value.decisions.length > 10000 || !value.decisions.every(decision => object(decision) && typeof decision.key === 'string' && decision.key.length <= 1024)) throw new Error('牌谱操作记录不完整，或超过 10,000 条限制。');
   if (value.replayPosition != null && (!Number.isInteger(value.replayPosition) || Number(value.replayPosition) < 0 || Number(value.replayPosition) > 200000)) throw new Error('牌谱回放位置无效。');
@@ -76,6 +90,7 @@ export function validateSavedGame(value: unknown): SavedGame {
   if (value.autoPlayDifficulty !== undefined) save.autoPlayDifficulty = value.autoPlayDifficulty as SavedGame['autoPlayDifficulty'];
   if (value.autoExchangeThree !== undefined) save.autoExchangeThree = value.autoExchangeThree as boolean;
   if (value.aiVersion != null) save.aiVersion = Number(value.aiVersion);
+  if (value.rulesVersion !== undefined) save.rulesVersion = value.rulesVersion;
   if (value.replayPosition != null) save.replayPosition = Number(value.replayPosition);
   if (value.matchLength === 'endless') {
     if (!validEndlessCheckpoint(value.checkpoint, save.mode)) throw new Error('无限牌谱缺少有效的单局起始信息。');
@@ -115,6 +130,7 @@ function newRecord(save: SavedGame, source: GameRecord['source'], title?: string
 export function createRecordStore(storage: StoragePort | null = safeStorage()) {
   const records = new Map<string, GameRecord>(), history = new Map<string, PlayedHistory>(), active = new Set<string>(), listeners = new Set<() => void>();
   let visible: readonly GameRecord[] = [], error: string | null = null, timer: ReturnType<typeof setTimeout> | null = null, dirty = false;
+  let persistencePauses = 0;
   let visibleHistory: readonly PlayedHistory[] = [];
   let resumeSession: { id: string; config: string } | undefined;
   const notify = () => { visible = [...records.values()].reverse().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); visibleHistory = [...history.values()]; for (const listener of listeners) listener(); };
@@ -123,7 +139,11 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (!object(parsed) || parsed.version !== 1 || !Array.isArray(parsed.records) || parsed.records.length > MAX_RECORDS + KEEP_RECENT + 1) throw new Error('格式无效');
-      if (object(parsed.resumeSession) && typeof parsed.resumeSession.id === 'string' && typeof parsed.resumeSession.config === 'string') resumeSession = { id: parsed.resumeSession.id, config: parsed.resumeSession.config };
+      if (object(parsed.resumeSession) && typeof parsed.resumeSession.id === 'string' && typeof parsed.resumeSession.config === 'string') {
+        const config = migrateResumeConfig(parsed.resumeSession.config);
+        resumeSession = { id: parsed.resumeSession.id, config };
+        dirty ||= config !== parsed.resumeSession.config;
+      }
       for (const entry of parsed.records) {
         if (!object(entry) || typeof entry.id !== 'string' || typeof entry.title !== 'string' || !['played', 'imported'].includes(String(entry.source)) || !Array.isArray(entry.rounds)) continue;
         try {
@@ -158,10 +178,11 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
   }
   function flushRecords() {
     if (timer) { clearTimeout(timer); timer = null; }
+    if (persistencePauses > 0) return false;
     if (!dirty) return !!storage && !error;
     prune();
     if (storage) {
-      try { storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, records: [...records.values()], history: [...history.values()], resumeSession })); error = null; dirty = false; }
+      try { storage.setItem(STORAGE_KEY, exportRecordStorage()); error = null; dirty = false; }
       catch { error = '牌谱未能写入本地空间，最新记录仍在本次运行的内存中。请先导出需要保留的牌谱，再清理空间。'; }
     } else { error = '此环境无法使用本地牌谱存储，记录仅保留到本次运行结束。'; }
     notify();
@@ -169,8 +190,23 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
   }
   function changed(immediate = false) {
     dirty = true;
+    if (persistencePauses > 0) return;
     if (immediate) flushRecords();
     else if (!timer) timer = setTimeout(flushRecords, 5000);
+  }
+  function exportRecordStorage(): string {
+    return JSON.stringify({ version: 1, records: [...records.values()], history: [...history.values()], resumeSession });
+  }
+  function pauseRecordPersistence(): () => void {
+    persistencePauses++;
+    if (timer) { clearTimeout(timer); timer = null; }
+    let resumed = false;
+    return () => {
+      if (resumed) return;
+      resumed = true;
+      persistencePauses--;
+      if (persistencePauses === 0 && dirty && !timer) timer = setTimeout(flushRecords, 5000);
+    };
   }
   function beginRecord(saved: SavedGame, options: { resume?: boolean } = {}) {
     const save = validateSavedGame(saved);
@@ -274,13 +310,13 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
     records.set(record.id, record); changed(true); return record;
   }
   if (dirty) flushRecords();
-  return { beginRecord, observeRecord, flushRecords, listRecords: () => visible, listHistory: () => visibleHistory, subscribeRecords: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
+  return { beginRecord, observeRecord, flushRecords, exportRecordStorage, pauseRecordPersistence, listRecords: () => visible, listHistory: () => visibleHistory, subscribeRecords: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; },
     getRecord: (id: string) => records.get(id), getRecordsError: () => error,
     renameRecord, toggleFavorite, deleteRecord, exportRecordJson, importRecordJson };
 }
 
 const store = createRecordStore();
-export const { beginRecord, observeRecord, flushRecords, listRecords, listHistory, subscribeRecords, getRecord, getRecordsError, renameRecord, toggleFavorite, deleteRecord, exportRecordJson, importRecordJson } = store;
+export const { beginRecord, observeRecord, flushRecords, exportRecordStorage, pauseRecordPersistence, listRecords, listHistory, subscribeRecords, getRecord, getRecordsError, renameRecord, toggleFavorite, deleteRecord, exportRecordJson, importRecordJson } = store;
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', flushRecords);
   document.addEventListener('visibilitychange', () => { if (document.hidden) flushRecords(); });

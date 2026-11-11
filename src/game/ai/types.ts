@@ -1,7 +1,7 @@
 /** All AI input is a structured-clone-safe projection of one player's information. */
 export type Difficulty = 'novice' | 'standard' | 'advanced' | 'expert';
 
-export const AI_VERSION = 4;
+export const AI_VERSION = 5;
 export const DIFFICULTIES: ReadonlyArray<{ id: Difficulty; label: string; description: string }> = [
   { id: 'novice', label: '入门', description: '辨认搭子与孤张，适合熟悉规则。' },
   { id: 'standard', label: '标准', description: '计算向听与有效进张，选择有役的鸣牌。' },
@@ -27,6 +27,12 @@ export interface PublicOpponent {
   points: number;
   dealer: boolean;
   riichi: boolean;
+  /** False only for publicly retired players, such as a blood-battle winner. */
+  active?: boolean;
+  /** Publicly declared missing suit in Sichuan rules. */
+  voidSuit?: string;
+  /** An estimate derived from this opponent's exposed tiles and the table rules. */
+  expectedDealInValue?: number;
   /** Meld strings are public, e.g. m123-, z555+, p2222. */
   melds: string[];
   discards: PublicDiscard[];
@@ -40,6 +46,8 @@ export interface BotObservation {
   /** Whether point placement is relevant in the scheduled final hand or extension. */
   finalRound: boolean;
   playerCount: number;
+  /** Players still taking turns; absent keeps historical four-seat estimates. */
+  activePlayerCount?: number;
   ownHand: string;
   doraIndicators: string[];
   /** Exposed tiles outside rivers/melds/dora, e.g. extracted north or a regional wildcard indicator. */

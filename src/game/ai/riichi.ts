@@ -25,7 +25,7 @@ function shapeValue(hand: Hand, discard: string, observation: BotObservation): n
   return score;
 }
 
-function safeOpenYaku(hand: Hand, observation: BotObservation): boolean {
+export function safeOpenYaku(hand: Hand, observation: BotObservation): boolean {
   if (hand.menqian) return true;
   const values = new Set([`z${observation.seat + 1}`, `z${observation.roundWind + 1}`, 'z5', 'z6', 'z7']);
   if (hand._fulou.some((meld: string) => values.has(meld.slice(0, 2)))) return true;

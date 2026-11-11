@@ -1,4 +1,5 @@
-.table-area>.riichi-assist{position:absolute;top:18px;right:26px;z-index:3;display:flex;flex-direction:column;gap:6px;width:max-content;max-width:min(300px,calc(50% - 100px));max-height:calc(40% - 30px);padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;background:color-mix(in srgb,var(--panel) 94%,transparent);color:var(--cream);box-shadow:0 5px 16px #0002;pointer-events:none}
+.table-area>.riichi-assist{position:absolute;top:18px;right:26px;z-index:3;display:flex;flex-direction:column;gap:6px;width:max-content;max-width:min(300px,calc(50% - 100px));max-height:calc(40% - 30px);padding:8px 10px;border:1px solid var(--border-color);border-radius:8px;background:color-mix(in srgb,var(--panel) 94%,transparent);color:var(--cream);box-shadow:0 5px 16px #0002;pointer-events:auto;overflow-y:auto;overscroll-behavior:contain;scroll-behavior:auto}
+.table-area>.riichi-assist>*{flex-shrink:0}
 .assist-summary{display:flex;align-items:center;justify-content:space-between;gap:16px;min-width:0;line-height:18px}
 .assist-summary>span{font-size:11px;color:var(--muted)}
 .assist-summary>strong{font-size:14px;font-weight:500;letter-spacing:1px;color:var(--gold);white-space:nowrap}
@@ -19,7 +20,19 @@
 .assist-status.has-yaku>strong{color:var(--gold)}
 .assist-status>span{font-size:12px;color:#eab2a5}
 .assist-status>.regional-rule{font-size:13px;color:var(--cream)}
+.regional-waits>li{padding:0}
+.regional-waits>li>button{display:flex;align-items:center;gap:4px;padding:2px 4px 2px 2px;border:0;background:transparent;color:inherit;pointer-events:auto;text-align:left}
+.regional-waits>li>button>span{display:flex;flex-direction:column;gap:3px}
+.regional-waits .wait-ron em{color:var(--gold)}
+.regional-waits .wait-tsumo em{color:var(--cream)}
+.regional-waits .wait-insufficient em,.regional-waits .wait-blocked em{color:#eab2a5}
+.regional-waits button:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+.assist-wait-detail{border-top:1px solid var(--border-color);padding-top:6px;font-size:12px;line-height:1.6;pointer-events:auto}
+.assist-wait-detail>strong{font-weight:500;color:var(--gold)}
+.assist-wait-detail>div{display:flex;gap:10px;color:var(--cream)}
+.assist-wait-detail p{margin:4px 0 0;color:var(--muted)}
 .table-tools .assist-quick{color:var(--muted);font-size:11px;gap:5px;padding:0 5px}
 .table-tools .assist-quick.is-on{color:var(--gold)}
 .assist-quick i{display:block;width:5px;height:5px;border-radius:50%;background:currentColor}
 @media(max-width:1100px){.table-area>.riichi-assist{top:14px;right:14px;max-height:calc(40% - 28px)}}
+@media(orientation:landscape) and (max-height:500px) and (max-width:1100px){.table-area>.riichi-assist{top:4px;right:5px;width:min(210px,34%);max-width:none;max-height:calc(100% - 100px);overflow-y:auto;gap:3px;padding:5px 7px}}

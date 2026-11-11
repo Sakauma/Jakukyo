@@ -1,12 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SOURCE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-NODE_DIRECTORY="${JAKUKYO_NODE_DIRECTORY:-/home/sakauma/.nvm/versions/node/v22.20.0/bin}"
-if ! test -x "$NODE_DIRECTORY/node"; then
-  printf 'Existing WSL Node not found: %s\nSet JAKUKYO_NODE_DIRECTORY to an installed Node 22.12+ directory.\n' "$NODE_DIRECTORY" >&2
+supported_node() {
+  command -v node >/dev/null 2>&1 && node -e '
+    const [major, minor] = process.versions.node.split(".").map(Number);
+    process.exit(process.platform === "linux" && (major > 22 || major === 22 && minor >= 12) ? 0 : 1);
+  ' >/dev/null 2>&1
+}
+
+if test -n "${JAKUKYO_NODE_DIRECTORY:-}"; then
+  if ! test -x "$JAKUKYO_NODE_DIRECTORY/node"; then
+    printf 'WSL Node was not found in JAKUKYO_NODE_DIRECTORY: %s\n' "$JAKUKYO_NODE_DIRECTORY" >&2
+    exit 1
+  fi
+  export PATH="$JAKUKYO_NODE_DIRECTORY:$PATH"
+elif ! supported_node; then
+  nvm_script="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+  if test -s "$nvm_script"; then
+    set +u
+    . "$nvm_script" || true
+    nvm use --silent node >/dev/null 2>&1 || true
+    set -u
+  fi
+fi
+if ! supported_node; then
+  printf 'An installed Linux Node.js 22.12+ is required. Set JAKUKYO_NODE_DIRECTORY or select a supported PATH/NVM version.\n' >&2
   exit 1
 fi
-export PATH="$NODE_DIRECTORY:$PATH"
+if ! command -v npm >/dev/null 2>&1; then
+  printf 'npm was not found beside the selected Node.js installation.\n' >&2
+  exit 1
+fi
 BUILD_ROOT="$SOURCE_ROOT/.wsl-build"
 mkdir -p "$BUILD_ROOT" "$SOURCE_ROOT/release"
 # Separate Linux node_modules from the Windows development checkout.

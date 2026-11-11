@@ -154,6 +154,17 @@ function ScoreCards({ snapshot, result, progress }: { snapshot: GameSnapshot; re
   </section>;
 }
 
+/** The same scoring presentation is available without settlement animation. */
+export function ReplaySettlementDetails({ snapshot, theme, winners, result }: { snapshot: GameSnapshot; theme: TableTheme; winners: WinnerView[]; result: RoundResult | null }) {
+  const [selected, setSelected] = useState(0);
+  const winner = winners[Math.min(selected, winners.length - 1)];
+  return <div className="replay-settlement-details">
+    {winners.length > 1 && <nav className="replay-winner-tabs" aria-label="选择和牌记录">{winners.map((item, index) => <button type="button" key={index} aria-pressed={selected === index} onClick={() => setSelected(index)}>{nameOf(snapshot, item.playerId)} · {index + 1}</button>)}</nav>}
+    {winner && <WinDetail winner={winner} snapshot={snapshot} theme={theme} history revealed={winner.yaku.length} progress={1} />}
+    {result && <ScoreCards snapshot={snapshot} result={result} progress={1} />}
+  </div>;
+}
+
 function SettlementContent({ snapshot, theme, result, reducedMotion = false, onNext, onRestart, onLobby, onExport }: RoundSettlementProps & { result: RoundResult }) {
   const initialWinner = Math.max(0, result.winners.findIndex(winner => winner.playerId === snapshot.humanId));
   const [selected, setSelected] = useState(initialWinner);

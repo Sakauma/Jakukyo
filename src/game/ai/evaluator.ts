@@ -74,7 +74,7 @@ export function evaluateDanger(observation: BotObservation, tile: string, known 
   let maximumThreat = 0;
   const key = normalTile(tile), suit = key[0], rank = Number(key[1]);
   for (const opponent of observation.players) {
-    if (opponent.id === observation.ownId) continue;
+    if (opponent.id === observation.ownId || opponent.active === false || opponent.voidSuit === suit) continue;
     const threat = opponentThreat(opponent, observation.tilesLeft);
     maximumThreat = Math.max(maximumThreat, threat);
     // Permanent furiten makes every tile in this player's own river safe against their ron.
@@ -108,7 +108,7 @@ export function evaluateDanger(observation: BotObservation, tile: string, known 
     danger = Math.min(.42, danger * threat);
     const redCount = opponent.melds.join('').split('0').length - 1;
     const scale = observation.pointScale ?? 1;
-    const loss = (observation.expectedDealInValue ?? 4000 * scale) * (opponent.dealer ? observation.dealerValueMultiplier ?? 1.5 : 1)
+    const loss = (opponent.expectedDealInValue ?? observation.expectedDealInValue ?? 4000 * scale) * (opponent.dealer ? observation.dealerValueMultiplier ?? 1.5 : 1)
       + redCount * 1200 * scale + observation.honba * 300 * scale;
     survival *= 1 - danger;
     expectedLoss += danger * loss;
@@ -130,7 +130,8 @@ function placementProtection(observation: BotObservation): number {
 export function rankPublicCandidates(observation: BotObservation, candidates: GenericCandidate[], difficulty: Difficulty): BotDecision {
   if (!candidates.length) throw new Error('AI requires at least one legal candidate.');
   const known = visibleCounts(observation);
-  const ownDraws = Math.max(1, observation.tilesLeft / observation.playerCount);
+  const activePlayerCount = observation.activePlayerCount ?? observation.playerCount;
+  const ownDraws = Math.max(1, observation.tilesLeft / Math.max(1, activePlayerCount));
   const totalTiles = observation.tileLimits?.reduce((sum, value) => sum + value, 0) ?? 136;
   const unseen = Math.max(1, totalTiles - known.reduce((sum, value) => sum + value, 0));
   const scale = observation.pointScale ?? 1;

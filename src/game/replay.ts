@@ -10,7 +10,7 @@ export type { ReplayFrame } from './types';
 export async function buildReplayFrames(data: SavedGame): Promise<ReplayFrame[]> {
   validateReplayData(data);
   const options: SessionOptions = { mode: data.mode ?? 'riichi', seed: data.seed, matchLength: data.matchLength,
-    difficulty: data.difficulty ?? 'standard', startPoints: restoredStartPoints(data), autoPlayDifficulty: data.autoPlayDifficulty ?? 'expert', autoExchangeThree: data.autoExchangeThree ?? false, variantOptions: data.variantOptions,
+    difficulty: data.difficulty ?? 'standard', startPoints: restoredStartPoints(data), autoPlayDifficulty: data.autoPlayDifficulty ?? 'expert', autoExchangeThree: data.autoExchangeThree ?? false, rulesVersion: data.rulesVersion, variantOptions: data.variantOptions,
     speed: 0, autoPlay: false, quickControls: DEFAULT_QUICK_CONTROLS };
   const session = options.mode === 'riichi' ? new RiichiSession(options) : new RegionalSession(options);
   try { return await session.captureReplayFrames(structuredClone(data)); }

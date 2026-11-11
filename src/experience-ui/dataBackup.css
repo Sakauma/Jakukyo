@@ -1,0 +1,17 @@
+.data-backup{margin-top:22px;padding-top:18px;border-top:1px solid var(--border-color)}
+.data-backup h3{font-size:14px;font-weight:500;margin:0 0 12px;color:var(--cream)}
+.data-backup-actions{display:flex;flex-wrap:wrap;gap:9px}
+.data-backup-actions button{border:1px solid var(--border-color);background:var(--surface);border-radius:5px;padding:9px 12px;color:var(--cream);font-size:12px}
+.data-backup-actions button:hover{border-color:var(--gold)}
+.data-backup-actions .data-backup-primary{background:var(--gold);border-color:var(--gold);color:var(--surface)}
+.data-backup-file{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+.data-backup p,.data-recovery-content p{font-size:12px;line-height:1.7;color:var(--muted);margin:10px 0}
+.data-backup-confirm{margin-top:14px;padding:14px;border:1px solid var(--border-color);border-radius:7px;background:var(--surface)}
+.data-backup-confirm>strong{font-weight:500;color:var(--gold)}
+.data-backup-confirm dl{font-size:12px;margin:12px 0}
+.data-backup-confirm dl>div{display:flex;gap:12px;justify-content:space-between;margin:7px 0}
+.data-backup-confirm dt{color:var(--muted)}
+.data-backup-confirm dd{margin:0;text-align:right;color:var(--cream)}
+.data-recovery-dialog .experience-overlay{z-index:150}
+.data-recovery-dialog .experience-panel{width:min(620px,100%);height:auto;max-height:90dvh}
+.data-recovery-content{padding:18px 24px 26px}

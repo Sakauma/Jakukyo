@@ -12,6 +12,8 @@ import type { TableTheme } from '../table/themes';
 import { deleteRecord, exportRecordJson, getRecordsError, importRecordJson, listRecords, renameRecord, subscribeRecords, toggleFavorite } from '../records/store';
 import type { GameRecord } from '../records/types';
 import { displayScoringText } from '../presentation/scoringText';
+import { ExperienceDialog } from '../experience-ui/ExperienceDialog';
+import { ReplaySettlementDetails } from '../settlement/RoundSettlement';
 import './replay.css';
 
 const dateText = (value: string) => new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
@@ -27,6 +29,7 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
   const [index, setIndex] = useState(0), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState(1);
   const [showHands, setShowHands] = useState(false), [view, setView] = useState<'perspective' | 'overhead'>('perspective');
   const [failed3D, setFailed3D] = useState(false);
+  const [showScoring, setShowScoring] = useState(false);
   useEffect(() => {
     let stopped = false;
     setLoading(true); setError(''); setFrames([]); setIndex(0); setPlaying(false); setShowHands(false);
@@ -50,12 +53,32 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
     return entries;
   }, [frames]);
   const roundIndex = rounds.findIndex(round => round.key === frame?.roundKey);
+  const keyMoments = useMemo(() => {
+    const moments: Array<{ index: number; label: string }> = [];
+    const wins = new Set<string>();
+    const endings = new Set<string>();
+    frames.forEach((item, at) => {
+      const win = item.snapshot.latestWin;
+      if (win && !wins.has(win.id)) {
+        wins.add(win.id);
+        const names = win.winners.map(winner => item.snapshot.players.find(player => player.id === winner.playerId)?.name ?? '玩家');
+        moments.push({ index: at, label: `${item.snapshot.round.wind}${item.snapshot.round.hand}局 · ${names.join('、')}和牌` });
+      }
+      if (item.snapshot.status === 'roundEnd' && !endings.has(item.roundKey)) {
+        endings.add(item.roundKey);
+        moments.push({ index: at, label: `${item.snapshot.round.wind}${item.snapshot.round.hand}局 · 结算` });
+      }
+    });
+    return moments;
+  }, [frames]);
   const snapshot = useMemo<GameSnapshot | null>(() => frame ? {
     ...frame.snapshot, actions: [], autoPlay: false, latestWin: undefined,
     players: frame.snapshot.players.map(player => ({ ...player, revealedHand: showHands && frame.allHands ? frame.allHands[player.id] : undefined })),
   } : null, [frame, showHands]);
   const playerNames = snapshot?.players.map(player => player.name) ?? [];
   const go = (target: number) => { setPlaying(false); setIndex(Math.max(0, Math.min(frames.length - 1, target))); };
+  const detailWinners = snapshot?.result?.winners.length ? snapshot.result.winners : frame?.snapshot.latestWin?.winners ?? [];
+  const hasScoring = !!snapshot?.result || detailWinners.length > 0;
 
   return <div className="replay-viewer">
     <div className="replay-view-heading"><button type="button" onClick={onBack}>← 牌谱库</button><div><span className="replay-label">回放</span><h3>{record.title}</h3></div><button type="button" onClick={() => exportFile(record)}>导出 JSON</button></div>
@@ -72,6 +95,7 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
           <span className="replay-label">当前动作</span><p className="replay-action" aria-live="polite">{displayScoringText(frame.actionLabel || snapshot.message, snapshot.mode, playerNames)}</p>
           <dl><div><dt>玩法</dt><dd>{getMode(record.mode).name}</dd></div><div><dt>对局进度</dt><dd>{index + 1} / {frames.length} 步</dd></div><div><dt>记录状态</dt><dd>{recordStatus(record)}</dd></div></dl>
           <label className="replay-reveal" title={frame.allHands ? undefined : '本局结束后可查看'}><input type="checkbox" checked={showHands && !!frame.allHands} disabled={!frame.allHands} onChange={event => setShowHands(event.target.checked)} />查看各家手牌</label>
+          {hasScoring && <button className="replay-scoring-open" type="button" onClick={() => { setPlaying(false); setShowScoring(true); }}>查看计分明细</button>}
           
           {!!snapshot.round.doraIndicators.length && <div className="replay-dora"><span>宝牌指示牌</span><div>{snapshot.round.doraIndicators.map((tile, at) => <TilePortrait key={at} tile={tile} theme={theme} />)}</div></div>}
           {snapshot.result && <div className="replay-result"><strong>{displayScoringText(snapshot.result.title, snapshot.mode, playerNames)}</strong><p>{displayScoringText(snapshot.result.description, snapshot.mode, playerNames)}</p>{snapshot.result.winners.map((winner, at) => <p key={at}>{snapshot.players.find(player => player.id === winner.playerId)?.name} · {winner.han || snapshot.mode?.startsWith('sichuan') ? `${winner.han} 番` : ''}{winner.fu ? ` ${winner.fu} 符` : ''} · {winner.points.toLocaleString()} {snapshot.scoreUnit ?? '点'}</p>)}</div>}
@@ -79,8 +103,9 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
       </div>
       <footer className="replay-controls">
         <label className="replay-progress"><span>回放进度</span><input aria-label="回放进度" type="range" min="0" max={Math.max(0, frames.length - 1)} value={index} onChange={event => go(Number(event.target.value))} /><output>{index + 1} / {frames.length}</output></label>
-        <div className="replay-transport"><button type="button" disabled={roundIndex <= 0} onClick={() => go(rounds[roundIndex - 1].index)}>上一局</button><button type="button" disabled={index <= 0} onClick={() => go(index - 1)}>上一动作</button><button className="replay-play" type="button" onClick={() => { if (index === frames.length - 1) setIndex(0); setPlaying(!playing); }}>{playing ? '暂停回放' : '播放回放'}</button><button type="button" disabled={index >= frames.length - 1} onClick={() => go(index + 1)}>下一动作</button><button type="button" disabled={roundIndex < 0 || roundIndex >= rounds.length - 1} onClick={() => go(rounds[roundIndex + 1].index)}>下一局</button><label>速度<select aria-label="回放速度" value={speed} onChange={event => setSpeed(Number(event.target.value))}>{[.5, 1, 2, 4].map(value => <option value={value} key={value}>{value}×</option>)}</select></label></div>
+        <div className="replay-transport"><button type="button" disabled={roundIndex <= 0} onClick={() => go(rounds[roundIndex - 1].index)}>上一局</button><button type="button" disabled={index <= 0} onClick={() => go(index - 1)}>上一动作</button><button className="replay-play" type="button" onClick={() => { if (index === frames.length - 1) setIndex(0); setPlaying(!playing); }}>{playing ? '暂停回放' : '播放回放'}</button><button type="button" disabled={index >= frames.length - 1} onClick={() => go(index + 1)}>下一动作</button><button type="button" disabled={roundIndex < 0 || roundIndex >= rounds.length - 1} onClick={() => go(rounds[roundIndex + 1].index)}>下一局</button><label>定位<select aria-label="跳到和牌或结算" value="" onChange={event => { if (event.target.value !== '') go(Number(event.target.value)); }}><option value="">和牌／结算</option>{keyMoments.map((moment, at) => <option key={at} value={moment.index}>{moment.label}</option>)}</select></label><label>速度<select aria-label="回放速度" value={speed} onChange={event => setSpeed(Number(event.target.value))}>{[.5, 1, 2, 4].map(value => <option value={value} key={value}>{value}×</option>)}</select></label></div>
       </footer>
+      {showScoring && <div className="replay-score-dialog"><ExperienceDialog title="回放计分明细" onClose={() => setShowScoring(false)}><ReplaySettlementDetails snapshot={snapshot} theme={theme} winners={detailWinners} result={snapshot.result} /></ExperienceDialog></div>}
     </> : <div className="replay-empty">牌谱没有可回看的动作。</div>}
   </div>;
 }

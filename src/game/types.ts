@@ -133,6 +133,20 @@ export interface RiichiAssistView {
   /** True only when the actual current legal actions include ron. */
   ronAvailable: boolean;
 }
+export interface RegionalWaitView {
+  tile: TileCode;
+  ron: boolean;
+  tsumo: boolean;
+  ronFan?: number;
+  tsumoFan?: number;
+  status: 'ron' | 'tsumo' | 'insufficient' | 'blocked';
+  reasons: string[];
+}
+export interface RegionalHandHint {
+  shanten: number | null;
+  waits: TileCode[];
+  waitDetails: RegionalWaitView[];
+}
 export interface QuickControls { autoWin: boolean; autoDiscard: boolean; noCall: boolean }
 /** A real shape-completing opponent event that did not offer legal ron. */
 export interface RonNotice {
@@ -179,6 +193,8 @@ export interface GameSnapshot {
   waits: TileCode[];
   /** Public-information hints for four-player riichi and sanma only. */
   riichiAssist?: RiichiAssistView;
+  regionalAssist?: RegionalHandHint;
+  rulesVersion?: 1 | 2;
   mode?: ModeId;
   modeName?: string;
   difficulty?: Difficulty;
@@ -191,6 +207,8 @@ export interface GameSnapshot {
 }
 export interface SessionOptions {
   mode?: ModeId;
+  /** Regional legality and scoring version; old saves without it use version 1. */
+  rulesVersion?: 1 | 2;
   difficulty?: Difficulty;
   /** Restore a supported table's original balance; new regional tables default to 100. */
   startPoints?: number;
@@ -229,6 +247,7 @@ export interface SavedGame {
   startPoints?: number;
   difficulty?: Difficulty;
   aiVersion?: number;
+  rulesVersion?: 1 | 2;
   /** Last selected human autoplay level; historical actions remain explicit decisions. */
   autoPlayDifficulty?: Difficulty;
   autoExchangeThree?: boolean;
@@ -248,8 +267,8 @@ export type GameSessionAPI = RiichiSessionAPI;
 export interface ReplayData extends SavedGame { rules: Record<string, unknown>; log: unknown }
 export interface RiichiSessionAPI {
   getSnapshot(): GameSnapshot;
-  /** On-demand shape-only preview for a currently legal regional discard. */
-  getRegionalHint?(discardId: string): { shanten: number | null; waits: TileCode[] } | null;
+  /** Current-condition win eligibility after a currently legal regional discard. */
+  getRegionalHint?(discardId: string): RegionalHandHint | null;
   subscribe(listener: () => void): () => void;
   dispatch(actionId: string): boolean;
   newGame(options?: SessionOptions): void;
