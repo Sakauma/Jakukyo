@@ -1,5 +1,5 @@
 import type { GameSnapshot, HandTile } from '../../game/types';
-import { motionDuration, needsTableBaseline, tableMotionCues, tileArrivalTime } from '../../presentation/tableTimeline';
+import { motionDuration, needsTableBaseline, tableMotionCues, tableScope, tileArrivalTime } from '../../presentation/tableTimeline';
 import { riverLayout } from '../riverLayout';
 import { tableSeat } from '../themes';
 import { tileRestHeight } from '../tableMaterials';
@@ -8,6 +8,7 @@ import { HAND_ROW_Z, seatLayout } from '../tableLayout';
 import { visibleWallCount, wallTileInSeat, wallTileTransform } from '../wallLayout';
 import { riverSelectionScope } from '../../presentation/riverMatches';
 import type { DiscardIntent } from '../../presentation/handInteraction';
+import { createPlacementSeed } from '../tilePlacement';
 
 export type Vec3 = [number, number, number];
 export interface TileMotion {
@@ -28,6 +29,7 @@ interface HandSlot {
 }
 export interface TableMotionFrame {
   identity: number;
+  placementSeed: number;
   hand: HandSlot[];
   motions: Map<string, TileMotion>;
   latestDiscard: { seat: number; sourceIndex: number } | null;
@@ -55,6 +57,7 @@ function wallOrigin(before: GameSnapshot, seat: number): { position: Vec3; rotat
 export function createTableMotionController() {
   let previous: GameSnapshot | null = null, hand: HandSlot[] = [], selected: string | null = null;
   let identity = 0, nextKey = 0, wasLobby = true, needsBaseline = false;
+  let placementSeed = createPlacementSeed(), previousSession: object | null | undefined;
   let motions = new Map<string, TileMotion>();
   let seenIntent = -1;
   let pendingDiscard: { slot: HandSlot; from?: Vec3; rotation?: Vec3 } | null = null;
@@ -66,10 +69,18 @@ export function createTableMotionController() {
     cancel,
     captureReleaseOrigin(tileId: string, selectionScope: string, from: Vec3, rotation: Vec3) { releasedOrigin = { tileId, selectionScope, from: [...from], rotation: [...rotation] }; },
     clearReleaseOrigin() { releasedOrigin = null; },
-    update(snapshot: GameSnapshot | null, incoming: HandTile[], selectedId: string | null, reduced: boolean, discardIntent?: DiscardIntent | null): TableMotionFrame {
+    update(snapshot: GameSnapshot | null, incoming: HandTile[], selectedId: string | null, reduced: boolean, discardIntent?: DiscardIntent | null, sessionIdentity?: object | null): TableMotionFrame {
       const now = performance.now(), hidden = typeof document !== 'undefined' && document.hidden;
-      const baseline = !!snapshot && (needsBaseline || wasLobby || needsTableBaseline(previous, snapshot)) || !snapshot && !wasLobby;
-      if (baseline) { cancel(); hand = []; pendingDiscard = null; releasedOrigin = null; latestDiscard = null; identity++; }
+      const backwards = !!snapshot && !!previous && (snapshot.revision < previous.revision || (snapshot.log.at(-1)?.id ?? 0) < (previous.log.at(-1)?.id ?? 0));
+      const newHand = previousSession !== sessionIdentity || !!snapshot && (wasLobby || !!previous && (tableScope(previous) !== tableScope(snapshot)
+        || snapshot.status === 'playing' && (snapshot.round.honba !== previous.round.honba
+          || !backwards && (previous.status !== 'playing' || snapshot.round.tilesLeft > previous.round.tilesLeft + 10)))) || !snapshot && !wasLobby;
+      const baseline = newHand || !!snapshot && (needsBaseline || needsTableBaseline(previous, snapshot));
+      if (baseline) {
+        cancel();
+        if (newHand) { hand = []; placementSeed = createPlacementSeed(); }
+        pendingDiscard = null; releasedOrigin = null; latestDiscard = null; identity++;
+      }
       const before = previous;
       const cues = snapshot && before && !baseline && !hidden ? tableMotionCues(before, snapshot).filter(cue => !cue.flowerSupplement) : [];
       if (discardIntent && discardIntent.sequence !== seenIntent) {
@@ -176,8 +187,8 @@ export function createTableMotionController() {
       }
 
       if (humanDiscard) pendingDiscard = null;
-      previous = snapshot; selected = selectedId; wasLobby = !snapshot; needsBaseline = hidden;
-      return { identity, hand, motions, latestDiscard };
+      previous = snapshot; previousSession = sessionIdentity; selected = selectedId; wasLobby = !snapshot; needsBaseline = hidden;
+      return { identity, placementSeed, hand, motions, latestDiscard };
     },
   };
 }

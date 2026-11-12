@@ -444,7 +444,7 @@ export default function App() {
 
     <main className="game-shell">
       <div className="table-area" aria-label="3D 麻将牌桌">
-        {experiencePanel !== 'library' && <SceneBoundary><MahjongTable snapshot={snapshot} displayHand={displayHand} selectedId={selectedId} highlightedTile={highlightedTile} selectedIds={snapshot?.setupSelection} interactiveIds={selectable.map(tile => tile.id)} onSelect={selectTile} onTileDiscard={discardTile} discardAction={discardAction} discardIntent={discardIntent} view={view} theme={theme} celebration={reducedMotion ? null : celebration} reducedMotion={reducedMotion} previewPlayerCount={selectedMode.players} onFailure={() => setWebglFailed(true)} onRestore={() => setWebglFailed(false)} /></SceneBoundary>}
+        {experiencePanel !== 'library' && <SceneBoundary><MahjongTable snapshot={snapshot} sessionIdentity={session} displayHand={displayHand} selectedId={selectedId} highlightedTile={highlightedTile} selectedIds={snapshot?.setupSelection} interactiveIds={selectable.map(tile => tile.id)} onSelect={selectTile} onTileDiscard={discardTile} discardAction={discardAction} discardIntent={discardIntent} view={view} theme={theme} celebration={reducedMotion ? null : celebration} reducedMotion={reducedMotion} previewPlayerCount={selectedMode.players} onFailure={() => setWebglFailed(true)} onRestore={() => setWebglFailed(false)} /></SceneBoundary>}
         <div className="table-vignette" />
         <div id="table-tools" className={`table-tools ${mobileToolsOpen ? 'mobile-open' : ''}`} onClick={event => { if (event.target instanceof Element && event.target.closest('button')) setMobileToolsOpen(false); }} onChange={event => { if (event.target instanceof HTMLSelectElement) setMobileToolsOpen(false); }}>
           {snapshot && <>
