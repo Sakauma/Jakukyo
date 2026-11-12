@@ -231,7 +231,7 @@ export interface BotReplayDecision {
   playerId: number;
   sequence: number;
   key: string;
-  source?: 'algorithm' | 'mcr-model-hybrid' | 'riichi-model-hybrid';
+  source?: 'algorithm' | 'mcr-model-hybrid' | 'riichi-model-hybrid' | 'sichuan-model-hybrid';
 }
 export interface SavedAiModel {
   id: string;

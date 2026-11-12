@@ -34,6 +34,7 @@ export interface RegionalBotInput {
   wildcard?: string;
   sichuan?: SichuanOptions;
   rulesVersion?: 1 | 2;
+  exchangeThree?: boolean;
   furiten?: { temporary: boolean; permanent: boolean };
   modelFeatures?: Float32Array;
   focusKeys?: string[];

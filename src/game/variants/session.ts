@@ -1,7 +1,7 @@
 import type { Difficulty, BotObservation, GenericCandidate } from '../ai/types';
 import { AI_VERSION, validDifficulty } from '../ai/types';
 import { rankPublicCandidates, samplePublicDraws } from '../ai/evaluator';
-import { chooseRegionalAction } from '../ai/regional';
+import { chooseSichuanHybridAction, supportsSichuanModelTable, SICHUAN_MODEL_IDENTITY } from '../ai/models/sichuanHybrid';
 import { encodeMcrFeatures, MCR_MODEL_IDENTITY } from '../ai/models/mcrFeatures';
 import type { BotDecision } from '../ai/types';
 import type { BotReplayDecision } from '../types';
@@ -126,7 +126,11 @@ export class RegionalSession implements GameSessionAPI {
     return distance;
   }
   private effectiveAiVersion(player: Player): number {
-    return player.id === 0 && !this.replaying ? this.aiVersion >= 7 ? AI_VERSION : 6 : this.aiVersion;
+    return player.id === 0 && !this.replaying ? this.aiVersion >= 7 ? this.aiVersion : 6 : this.aiVersion;
+  }
+  private usesSichuanModel(): boolean {
+    return supportsSichuanModelTable({ aiVersion: this.aiVersion, profile: this.profile, rulesVersion: this.rulesVersion,
+      exchangeThree: this.options.variantOptions?.exchangeThree ?? false, sichuan: this.sichuanOptions });
   }
   private hideOpponentConcealedKongs(): boolean {
     return this.aiVersion >= 7 && this.profile.id === 'mcr' && this.stage !== 'settlement' && this.stage !== 'match';
@@ -593,7 +597,7 @@ export class RegionalSession implements GameSessionAPI {
   }
   private regionalBotInput(player: Player, choices: Choice[]): RegionalBotInput {
     return {
-      ...(this.effectiveAiVersion(player) >= 7 ? { aiVersion: 7,
+      ...(this.effectiveAiVersion(player) >= 7 ? { aiVersion: this.effectiveAiVersion(player),
         furiten: { temporary: player.temporaryFuriten, permanent: player.permanentFuriten },
         ...(this.profile.id === 'mcr' && this.mcrFeatures[player.id] ? { modelFeatures: this.mcrFeatures[player.id].slice() } : {}) } : {}),
       observation: structuredClone(this.observation(player)),
@@ -620,6 +624,7 @@ export class RegionalSession implements GameSessionAPI {
       wildcard: this.wildcard,
       sichuan: this.sichuanOptions ? { ...this.sichuanOptions } : undefined,
       rulesVersion: this.rulesVersion,
+      exchangeThree: this.options.variantOptions?.exchangeThree ?? false,
     };
   }
   private decisionStateKey(input: RegionalBotInput): string {
@@ -695,7 +700,7 @@ export class RegionalSession implements GameSessionAPI {
       const cacheKey=this.decisionStateKey(input);
       const cached=this.decisionCache.get(cacheKey);
       this.decisionCache.delete(cacheKey);
-      const decision=cached?undefined:chooseRegionalAction(input);
+      const decision=cached?undefined:chooseSichuanHybridAction(input);
       const key=cached??decision!.key;
       this.commitBotChoice(player.id,key,this.decisionProviders.get(cacheKey)??decision?.provider);
       this.decisionProviders.delete(cacheKey);
@@ -878,6 +883,7 @@ export class RegionalSession implements GameSessionAPI {
   }
   getSavedGame():SavedGame{return {version:1,seed:this.options.seed,matchLength:this.options.matchLength,mode:this.profile.id,difficulty:this.options.difficulty,startPoints:this.options.startPoints,autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:this.options.autoExchangeThree,aiVersion:this.aiVersion,rulesVersion:this.rulesVersion,replayPosition:this.step,variantOptions:this.options.variantOptions?structuredClone(this.options.variantOptions):undefined,decisions:this.decisions.map(d=>({...d})),
     ...(this.aiVersion>=7?{botDecisions:this.botDecisions.map(decision=>({...decision})).sort((a,b)=>a.step-b.step||a.playerId-b.playerId||a.sequence-b.sequence),...(this.profile.id==='mcr'?{aiModel:{...MCR_MODEL_IDENTITY}}:{})}:{}),
+    ...(this.usesSichuanModel()?{aiModel:{...SICHUAN_MODEL_IDENTITY}}:{}),
     ...(this.checkpoint?{checkpoint:structuredClone(this.checkpoint)}:{})};}
   exportReplay():ReplayData{return {...this.getSavedGame(),rules:{mode:this.profile.id,version:this.sichuanOptions?`${getMode(this.profile.id).name} v${this.sichuanOptions.version}`:getMode(this.profile.id).ruleVersion,summary:this.sichuanOptions?[...this.profile.summary,...sichuanRuleSummary(this.sichuanOptions)]:this.profile.summary},log:this.logs.map(l=>({...l}))};}
   loadSavedGame(data:SavedGame):boolean{

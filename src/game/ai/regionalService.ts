@@ -1,5 +1,5 @@
 import InlineRegionalWorker from './regionalWorker?worker&inline';
-import { chooseRegionalAction } from './regional';
+import { chooseSichuanHybridAction } from './models/sichuanHybrid';
 import type { RegionalBotInput } from './regional';
 import type { BotDecision } from './types';
 import { loadMcrAssets } from './models/mcrAssets';
@@ -22,7 +22,7 @@ export class RegionalDecisionService {
   get available(): boolean { return typeof Worker !== 'undefined' && !this.unavailable; }
 
   choose(input: RegionalBotInput): Promise<BotDecision | null> {
-    if (typeof Worker === 'undefined' || this.unavailable) return Promise.resolve(chooseRegionalAction(input));
+    if (typeof Worker === 'undefined' || this.unavailable) return Promise.resolve(chooseSichuanHybridAction(input));
     try {
       if (!this.worker) {
         const worker = new InlineRegionalWorker();
@@ -35,7 +35,7 @@ export class RegionalDecisionService {
           this.jobs.delete(event.data.id);
           const decision = event.data.decision as BotDecision | undefined;
           const legal = decision && job.input.actions.some(action => action.key === decision.key);
-          job.resolve(legal ? decision : chooseRegionalAction(job.input));
+          job.resolve(legal ? decision : chooseSichuanHybridAction(job.input));
         };
         worker.onerror = () => { if(this.worker===worker)this.failWorker(); };
       }
@@ -59,13 +59,13 @@ export class RegionalDecisionService {
           }
           void this.assetsPromise!.then(send, () => {
             const job = this.jobs.get(id);
-            if (job) { clearTimeout(job.timer); this.jobs.delete(id); job.resolve(chooseRegionalAction(input)); }
+            if (job) { clearTimeout(job.timer); this.jobs.delete(id); job.resolve(chooseSichuanHybridAction(input)); }
           });
         } else send();
       });
     } catch {
       this.unavailable = true;
-      return Promise.resolve(chooseRegionalAction(input));
+      return Promise.resolve(chooseSichuanHybridAction(input));
     }
   }
 
@@ -78,7 +78,7 @@ export class RegionalDecisionService {
     this.jobs.clear();
     for (const job of jobs) {
       clearTimeout(job.timer);
-      job.resolve(chooseRegionalAction(job.input));
+      job.resolve(chooseSichuanHybridAction(job.input));
     }
   }
 

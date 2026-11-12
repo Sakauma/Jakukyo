@@ -363,7 +363,7 @@ export class RiichiSession implements RiichiSessionAPI {
     const observation = createBotObservation(player.seatId, player._menfeng, player.shoupai.toString(), player.model, this.options.matchLength);
     const actions = botActions(choices);
     const difficulty = human ? this.options.autoPlayDifficulty : this.options.difficulty;
-    const decisionVersion = human ? this.aiVersion >= 7 ? AI_VERSION : 6 : this.aiVersion;
+    const decisionVersion = human ? this.aiVersion >= 7 ? this.aiVersion : 6 : this.aiVersion;
     const legacyOpponent = !human && this.aiVersion === 1;
     const synchronous = () => legacyOpponent
       ? chooseLegacyAction(observation, actions)
@@ -573,7 +573,7 @@ export class RiichiSession implements RiichiSessionAPI {
     return { ...this.getSavedGame(), rules: structuredClone(this.rule), log: this.finished ? structuredClone(this.game._paipu) : [...this.log] };
   }
   loadSavedGame(data: SavedGame): boolean {
-    if (!data || data.version !== 1 || (data.mode != null && data.mode !== 'riichi') || (data.difficulty != null && !validDifficulty(data.difficulty)) || (data.aiVersion != null && ![1, 2, 3, 4, 5, 6, AI_VERSION].includes(data.aiVersion)) || typeof data.seed !== 'string' || !['single', 'east', 'hanchan', 'endless'].includes(data.matchLength) || !Array.isArray(data.decisions) || data.decisions.length > 10000 || !data.decisions.every(decision => decision && typeof decision.key === 'string')) return false;
+    if (!data || data.version !== 1 || (data.mode != null && data.mode !== 'riichi') || (data.difficulty != null && !validDifficulty(data.difficulty)) || (data.aiVersion != null && ![1, 2, 3, 4, 5, 6, 7, AI_VERSION].includes(data.aiVersion)) || typeof data.seed !== 'string' || !['single', 'east', 'hanchan', 'endless'].includes(data.matchLength) || !Array.isArray(data.decisions) || data.decisions.length > 10000 || !data.decisions.every(decision => decision && typeof decision.key === 'string')) return false;
     try { validateReplayData(data); } catch { return false; }
     const previous = this.getSavedGame();
     const restore = (save: SavedGame): boolean => {

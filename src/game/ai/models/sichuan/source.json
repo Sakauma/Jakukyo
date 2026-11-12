@@ -1,0 +1,12 @@
+{
+  "id": "jakukyo-sichuan-v2-bc-20261112",
+  "trainingBaseline": "d79cdc7abebb90b82d068b2533ba1da6f94e8cf3",
+  "checkpoint": "best-bc.pt",
+  "parametersSha256": "57effd8baba35582bedbed1b7ca35f786dd0972f99e2f59785a9c309efaed3ae",
+  "featureVersion": 1,
+  "policyVersion": 1,
+  "scope": { "mode": "sichuan-blood", "rulesVersion": 2, "version": 2, "fanCap": 4, "selfDraw": "base", "menqingZhongzhang": false, "exchangeThree": false },
+  "training": { "teacher": "Jakukyo v7 expert bounded search", "trainGames": 256, "validationGames": 32, "bcEpochs": 60, "bestEpoch": 16, "seed": 20261112 },
+  "validation": { "crossEntropy": 0.8541685342788696, "samples": 1786, "accuracy": 0.6937289834022522, "nonforcedSamples": 1264, "nonforcedAccuracy": 0.5672468543052673 },
+  "reference": { "url": "https://github.com/twu3202/TanyaoDojo/tree/b44f7a62440db96186fa1c9553e1c6edb8e1bb71/sichuan", "license": "MIT", "used": "Clipped PPO formula, gamma=1, per-seat reward accumulation. Runtime, rules, features and MLP are project implementations." }
+}

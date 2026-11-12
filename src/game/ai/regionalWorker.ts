@@ -2,6 +2,7 @@ import { chooseRegionalAction } from './regional';
 import type { RegionalBotInput } from './regional';
 import type { BotDecision } from './types';
 import { chooseMcrHybridAction } from './models/mcrHybrid';
+import { chooseSichuanHybridAction } from './models/sichuanHybrid';
 import { initializeMcrModel } from './models/mcrRuntime';
 import type { McrModelAssets } from './models/mcrAssets';
 
@@ -21,7 +22,7 @@ workerScope.onmessage = event => {
     try {
       const hybrid = (input.aiVersion ?? 6) >= 7 && input.profile.id === 'mcr' && ['advanced', 'expert'].includes(input.difficulty);
       let decision: BotDecision;
-      try { decision = hybrid ? await chooseMcrHybridAction(input) : chooseRegionalAction(input); }
+      try { decision = hybrid ? await chooseMcrHybridAction(input) : chooseSichuanHybridAction(input); }
       catch { decision = chooseRegionalAction(input); }
       if (id > cancelledThrough) workerScope.postMessage({ id, decision });
     } catch (error) {
