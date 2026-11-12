@@ -66,25 +66,46 @@ class ActorCritic(nn.Module):
 
 
 def read_data(path, policy_only=False):
-    records = []
     seeds = []
-    for line in Path(path).read_text(encoding="utf8").splitlines():
-        episode = json.loads(line)
-        seeds.append(episode["seed"])
-        for trajectory in episode["trajectories"]:
-            records.extend(record for record in trajectory if not policy_only or record["policy"])
-    features = np.stack([np.frombuffer(base64.b64decode(record["f"]), dtype="<f4") for record in records]).copy()
-    mask = np.zeros((len(records), 137), dtype=np.bool_)
-    for row, record in enumerate(records):
-        mask[row, record["m"]] = True
-    result = {
-        "x": torch.tensor(features, device=DEVICE),
-        "mask": torch.tensor(mask, device=DEVICE),
-        "a": torch.tensor([record["a"] for record in records], device=DEVICE),
-        "g": torch.tensor([record["g"] for record in records], device=DEVICE),
-        "lp": torch.tensor([record["lp"] for record in records], device=DEVICE),
-        "v": torch.tensor([record["v"] for record in records], device=DEVICE),
+    samples = 0
+    floating = {key: False for key in ("g", "lp", "v")}
+    with Path(path).open(encoding="utf8") as stream:
+        for line in stream:
+            episode = json.loads(line)
+            seeds.append(episode["seed"])
+            for trajectory in episode["trajectories"]:
+                for record in trajectory:
+                    if policy_only and not record["policy"]:
+                        continue
+                    samples += 1
+                    for key in floating:
+                        floating[key] |= isinstance(record[key], float)
+    if not samples:
+        raise ValueError("Dataset contains no selected decisions")
+    arrays = {
+        "x": np.empty((samples, 464), dtype=np.float32),
+        "mask": np.zeros((samples, 137), dtype=np.bool_),
+        "a": np.empty(samples, dtype=np.int64),
+        **{key: np.empty(samples, dtype=np.float32 if floating[key] else np.int64) for key in floating},
     }
+    row = 0
+    with Path(path).open(encoding="utf8") as stream:
+        for line in stream:
+            episode = json.loads(line)
+            for trajectory in episode["trajectories"]:
+                for record in trajectory:
+                    if policy_only and not record["policy"]:
+                        continue
+                    if row >= samples:
+                        raise ValueError("Dataset changed while it was being loaded")
+                    arrays["x"][row] = np.frombuffer(base64.b64decode(record["f"]), dtype="<f4")
+                    arrays["mask"][row, record["m"]] = True
+                    for key in ("a", "g", "lp", "v"):
+                        arrays[key][row] = record[key]
+                    row += 1
+    if row != samples:
+        raise ValueError("Dataset changed while it was being loaded")
+    result = {key: torch.from_numpy(array).to(DEVICE) for key, array in arrays.items()}
     if not result["mask"].gather(1, result["a"].unsqueeze(1)).all():
         raise ValueError("Dataset includes an illegal teacher/sample action")
     return result, seeds
@@ -204,9 +225,10 @@ def run_bc(args):
         steps = prior["step"]
         start_epoch = history[-1]["epoch"]
         initial_parameters = torch.cat([parameter.detach().flatten() for parameter in model.parameters()]).clone()
+    baseline_validation = evaluate(model, validation)
     best = float("inf")
     if args.resume:
-        best = evaluate(model, validation)["cross_entropy"]
+        best = baseline_validation["cross_entropy"]
         best_path = ROOT / "models/best-bc.pt"
         keep_existing = False
         if best_path.exists():
@@ -247,6 +269,7 @@ def run_bc(args):
     continuation = check_training_restore(ROOT / "models/best-bc.pt", train, args.batch)
     report = {"phase": "bc", "device": DEVICE_REPORT, "epochs": args.epochs, "batch": args.batch,
               "resumedFrom": args.resume, "resumedStartEpoch": start_epoch,
+              "baseline_validation": baseline_validation,
               "steps": steps, "learning_rate": 0.001, "weight_decay": 0.0001, "value_coefficient": 0.25,
               "suit_augmentation": True, "seed": SEED, "train_seeds": train_seeds, "validation_seeds": val_seeds,
               "history": history, "best_validation": before, "restore_exact": before == after,
