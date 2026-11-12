@@ -13,6 +13,10 @@ export function validDifficulty(value: unknown): value is Difficulty {
   return DIFFICULTIES.some(item => item.id === value);
 }
 
+export function resolveAutoPlayDifficulty(options: { difficulty: Difficulty; autoPlayDifficulty: Difficulty; autoPlayMatchDifficulty: boolean }): Difficulty {
+  return options.autoPlayMatchDifficulty ? options.difficulty : options.autoPlayDifficulty;
+}
+
 export interface PublicDiscard {
   tile: string;
   /** Claimed discards are already counted in the public meld, so do not count twice. */

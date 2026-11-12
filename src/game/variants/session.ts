@@ -1,5 +1,5 @@
 import type { Difficulty, BotObservation, GenericCandidate } from '../ai/types';
-import { AI_VERSION, validDifficulty } from '../ai/types';
+import { AI_VERSION, resolveAutoPlayDifficulty, validDifficulty } from '../ai/types';
 import { rankPublicCandidates, samplePublicDraws } from '../ai/evaluator';
 import { chooseSichuanHybridAction, supportsSichuanModelTable, SICHUAN_MODEL_IDENTITY } from '../ai/models/sichuanHybrid';
 import { encodeMcrFeatures, MCR_MODEL_IDENTITY } from '../ai/models/mcrFeatures';
@@ -33,7 +33,7 @@ const NAMES=['你','青岚','千鹤','北辰'];
 let displaySessionSequence=0;
 
 export class RegionalSession implements GameSessionAPI {
-  private options:SessionOptions&{seed:string;mode:ModeId;difficulty:Difficulty;startPoints:number;autoPlayDifficulty:Difficulty;autoExchangeThree:boolean;speed:number;autoPlay:boolean;matchLength:'single'|'east'|'hanchan'|'endless'};
+  private options:SessionOptions&{seed:string;mode:ModeId;difficulty:Difficulty;startPoints:number;autoPlayDifficulty:Difficulty;autoPlayMatchDifficulty:boolean;autoExchangeThree:boolean;speed:number;autoPlay:boolean;matchLength:'single'|'east'|'hanchan'|'endless'};
   private profile:RuleProfile;
   private sichuanOptions?:SichuanOptions;
   private players:Player[]=[];
@@ -101,7 +101,7 @@ export class RegionalSession implements GameSessionAPI {
   constructor(options:SessionOptions={}){
     const mode=options.mode||'guangdong';
     this.profile=getProfile(mode);if(!this.profile)throw new Error('未实现的规则');
-    this.options={...options,mode,seed:options.seed||`table-${Date.now()}`,difficulty:options.difficulty||'standard',startPoints:validStartPoints(mode,options.startPoints)?options.startPoints:this.profile.startPoints,autoPlayDifficulty:validDifficulty(options.autoPlayDifficulty)?options.autoPlayDifficulty:'expert',autoExchangeThree:options.autoExchangeThree??false,speed:options.speed??450,autoPlay:options.autoPlay??false,matchLength:options.matchLength||'east'};
+    this.options={...options,mode,seed:options.seed||`table-${Date.now()}`,difficulty:options.difficulty||'standard',startPoints:validStartPoints(mode,options.startPoints)?options.startPoints:this.profile.startPoints,autoPlayDifficulty:validDifficulty(options.autoPlayDifficulty)?options.autoPlayDifficulty:'expert',autoPlayMatchDifficulty:options.autoPlayMatchDifficulty??true,autoExchangeThree:options.autoExchangeThree??false,speed:options.speed??450,autoPlay:options.autoPlay??false,matchLength:options.matchLength||'east'};
     this.random=seededRandom(this.options.seed);this.newGame(this.options);
   }
   getSnapshot=():GameSnapshot=>this.snapshot;
@@ -126,7 +126,7 @@ export class RegionalSession implements GameSessionAPI {
     return distance;
   }
   private effectiveAiVersion(player: Player): number {
-    return player.id === 0 && !this.replaying ? this.aiVersion >= 7 ? this.aiVersion : 6 : this.aiVersion;
+    return player.id === 0 && !this.replaying && !this.options.autoPlayMatchDifficulty ? Math.max(6, this.aiVersion) : this.aiVersion;
   }
   private usesSichuanModel(): boolean {
     return supportsSichuanModelTable({ aiVersion: this.aiVersion, profile: this.profile, rulesVersion: this.rulesVersion,
@@ -166,7 +166,7 @@ export class RegionalSession implements GameSessionAPI {
     this.rulesVersion = options.rulesVersion ?? (this.replaying ? 1 : 2);
     this.quickControls=updateQuickControls(this.quickControls,options.quickControls);
     this.cancel(false);const mode=options.mode||this.options.mode;this.profile=getProfile(mode);if(!this.profile)throw new Error('未实现的规则');
-    this.options={...this.options,...options,mode,seed:options.seed||this.options.seed,startPoints:validStartPoints(mode,options.startPoints)?options.startPoints:this.profile.startPoints,autoPlayDifficulty:validDifficulty(options.autoPlayDifficulty)?options.autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:options.autoExchangeThree??this.options.autoExchangeThree};
+    this.options={...this.options,...options,mode,seed:options.seed||this.options.seed,startPoints:validStartPoints(mode,options.startPoints)?options.startPoints:this.profile.startPoints,autoPlayDifficulty:validDifficulty(options.autoPlayDifficulty)?options.autoPlayDifficulty:this.options.autoPlayDifficulty,autoPlayMatchDifficulty:options.autoPlayMatchDifficulty??this.options.autoPlayMatchDifficulty,autoExchangeThree:options.autoExchangeThree??this.options.autoExchangeThree};
     const legacySichuan=this.replaying&&this.options.variantOptions?.sichuan===undefined;
     this.sichuanOptions=mode.startsWith('sichuan')?normalizeSichuanOptions(this.options.variantOptions?.sichuan,legacySichuan?1:2):undefined;
     // Preserve a historical save's absent field and record identity; new games save explicit v2 options.
@@ -619,7 +619,7 @@ export class RegionalSession implements GameSessionAPI {
         consume: choice.consume ? [...choice.consume] : undefined,
         index: choice.index, meldIndex: choice.meldIndex, kind: choice.kind,
       })),
-      difficulty: player.id === 0 ? this.options.autoPlayDifficulty : this.options.difficulty,
+      difficulty: player.id === 0 ? resolveAutoPlayDifficulty(this.options) : this.options.difficulty,
       drawn: player.drawn,
       wildcard: this.wildcard,
       sichuan: this.sichuanOptions ? { ...this.sichuanOptions } : undefined,
@@ -706,7 +706,7 @@ export class RegionalSession implements GameSessionAPI {
       this.decisionProviders.delete(cacheKey);
       return choices.find(choice=>choice.key===key)||choices[0];
     }
-    const difficulty=player.id===0?this.options.autoPlayDifficulty:this.options.difficulty;
+    const difficulty=player.id===0?resolveAutoPlayDifficulty(this.options):this.options.difficulty;
     // Every physical copy remains selectable by the human. The AI retains its
     // original canonical candidate set, including the separate actual drawn tile.
     const seen=new Set<string>();
@@ -850,7 +850,14 @@ export class RegionalSession implements GameSessionAPI {
     this.publish();this.schedule();return true;
   }
   setAutoPlay(enabled:boolean){this.options.autoPlay=enabled;this.cancel();this.publish();this.schedule();}
-  setAutoPlayDifficulty(difficulty:Difficulty){if(!validDifficulty(difficulty)||this.options.autoPlayDifficulty===difficulty)return;this.options.autoPlayDifficulty=difficulty;this.cancel();this.publish();this.schedule();}
+  setAutoPlayDifficulty(difficulty:Difficulty){
+    if(!validDifficulty(difficulty)||!this.options.autoPlayMatchDifficulty&&this.options.autoPlayDifficulty===difficulty)return;
+    this.options.autoPlayDifficulty=difficulty;this.options.autoPlayMatchDifficulty=false;this.cancel();this.publish();this.schedule();
+  }
+  setAutoPlayMatchDifficulty(enabled:boolean){
+    if(this.options.autoPlayMatchDifficulty===enabled)return;
+    this.options.autoPlayMatchDifficulty=enabled;this.cancel();this.publish();this.schedule();
+  }
   setAutoExchangeThree(enabled:boolean){this.options.autoExchangeThree=enabled;this.cancel();this.publish();this.schedule();}
   setQuickControls(controls:Partial<QuickControls>){this.quickControls=updateQuickControls(this.quickControls,controls);this.cancel();this.publish();this.schedule();}
   setSpeed(milliseconds:number){this.options.speed=Math.max(0,Math.min(3000,Number.isFinite(milliseconds)?milliseconds:450));this.cancel();this.publish();this.schedule();}
@@ -872,7 +879,8 @@ export class RegionalSession implements GameSessionAPI {
     if(this.profile.id==='sanma')this.snapshot.riichiAssist=this.calculateAssist(projectRiichiAssist(this.snapshot),{temporary:human.temporaryFuriten,riichiPass:human.permanentFuriten});
     this.snapshot.rulesVersion=this.rulesVersion;
     this.snapshot.quickControls={...this.quickControls};
-    this.snapshot.autoPlayDifficulty=this.options.autoPlayDifficulty;
+    this.snapshot.autoPlayDifficulty=resolveAutoPlayDifficulty(this.options);
+    this.snapshot.autoPlayMatchDifficulty=this.options.autoPlayMatchDifficulty;
     this.snapshot.autoExchangeThree=this.options.autoExchangeThree;
     if(this.ronNotice)this.snapshot.ronNotice=structuredClone(this.ronNotice);
     if(this.selfWinNotice&&this.stage==='discard'&&this.turn===0)this.snapshot.selfWinNotice=structuredClone(this.selfWinNotice);
@@ -881,7 +889,7 @@ export class RegionalSession implements GameSessionAPI {
     if(this.replaying)return;
     for(const listener of this.listeners)listener();
   }
-  getSavedGame():SavedGame{return {version:1,seed:this.options.seed,matchLength:this.options.matchLength,mode:this.profile.id,difficulty:this.options.difficulty,startPoints:this.options.startPoints,autoPlayDifficulty:this.options.autoPlayDifficulty,autoExchangeThree:this.options.autoExchangeThree,aiVersion:this.aiVersion,rulesVersion:this.rulesVersion,replayPosition:this.step,variantOptions:this.options.variantOptions?structuredClone(this.options.variantOptions):undefined,decisions:this.decisions.map(d=>({...d})),
+  getSavedGame():SavedGame{return {version:1,seed:this.options.seed,matchLength:this.options.matchLength,mode:this.profile.id,difficulty:this.options.difficulty,startPoints:this.options.startPoints,autoPlayDifficulty:this.options.autoPlayDifficulty,autoPlayMatchDifficulty:this.options.autoPlayMatchDifficulty,autoExchangeThree:this.options.autoExchangeThree,aiVersion:this.aiVersion,rulesVersion:this.rulesVersion,replayPosition:this.step,variantOptions:this.options.variantOptions?structuredClone(this.options.variantOptions):undefined,decisions:this.decisions.map(d=>({...d})),
     ...(this.aiVersion>=7?{botDecisions:this.botDecisions.map(decision=>({...decision})).sort((a,b)=>a.step-b.step||a.playerId-b.playerId||a.sequence-b.sequence),...(this.profile.id==='mcr'?{aiModel:{...MCR_MODEL_IDENTITY}}:{})}:{}),
     ...(this.usesSichuanModel()?{aiModel:{...SICHUAN_MODEL_IDENTITY}}:{}),
     ...(this.checkpoint?{checkpoint:structuredClone(this.checkpoint)}:{})};}
@@ -893,7 +901,7 @@ export class RegionalSession implements GameSessionAPI {
     const restore=(save:SavedGame)=>{
       this.aiVersion=save.aiVersion??2;
       this.replayBotChoices=new Map((save.botDecisions||[]).map(decision=>[`${decision.step}:${decision.playerId}:${decision.sequence}`,decision]));
-      this.replaying=true;this.initialize({seed:save.seed,mode:save.mode,difficulty:save.difficulty||'standard',startPoints:restoredStartPoints(save),autoPlayDifficulty:save.autoPlayDifficulty??'expert',autoExchangeThree:save.autoExchangeThree??false,rulesVersion:save.rulesVersion??1,variantOptions:save.variantOptions,matchLength:save.matchLength,autoPlay:false,quickControls:DEFAULT_QUICK_CONTROLS},save.checkpoint);let cursor=0;
+      this.replaying=true;this.initialize({seed:save.seed,mode:save.mode,difficulty:save.difficulty||'standard',startPoints:restoredStartPoints(save),autoPlayDifficulty:save.autoPlayDifficulty??'expert',autoPlayMatchDifficulty:save.autoPlayMatchDifficulty??true,autoExchangeThree:save.autoExchangeThree??false,rulesVersion:save.rulesVersion??1,variantOptions:save.variantOptions,matchLength:save.matchLength,autoPlay:false,quickControls:DEFAULT_QUICK_CONTROLS},save.checkpoint);let cursor=0;
       for(let guard=0;guard<100000;guard++){
         if(save.replayPosition!=null&&this.step>=save.replayPosition&&cursor===save.decisions.length)break;
         if(save.replayPosition!=null&&this.step>save.replayPosition)return false;
@@ -914,7 +922,7 @@ export class RegionalSession implements GameSessionAPI {
   async captureReplayFrames(data:SavedGame):Promise<ReplayFrame[]>{
     validateReplayData(data);this.cancel();this.replaying=true;this.replayFrames=[];this.aiVersion=data.aiVersion??2;
     this.replayBotChoices=new Map((data.botDecisions||[]).map(decision=>[`${decision.step}:${decision.playerId}:${decision.sequence}`,decision]));
-    this.initialize({seed:data.seed,mode:data.mode,difficulty:data.difficulty||'standard',startPoints:restoredStartPoints(data),autoPlayDifficulty:data.autoPlayDifficulty??'expert',autoExchangeThree:data.autoExchangeThree??false,rulesVersion:data.rulesVersion??1,variantOptions:data.variantOptions,matchLength:data.matchLength,autoPlay:false,speed:0,quickControls:DEFAULT_QUICK_CONTROLS},data.checkpoint);
+    this.initialize({seed:data.seed,mode:data.mode,difficulty:data.difficulty||'standard',startPoints:restoredStartPoints(data),autoPlayDifficulty:data.autoPlayDifficulty??'expert',autoPlayMatchDifficulty:data.autoPlayMatchDifficulty??false,autoExchangeThree:data.autoExchangeThree??false,rulesVersion:data.rulesVersion??1,variantOptions:data.variantOptions,matchLength:data.matchLength,autoPlay:false,speed:0,quickControls:DEFAULT_QUICK_CONTROLS},data.checkpoint);
     let cursor=0;
     for(let guard=0;guard<MAX_REPLAY_STEPS;guard++){
       const exactEnd=data.replayPosition!=null;

@@ -18,6 +18,7 @@ export function validateReplayData(data: SavedGame): void {
     || (data.difficulty != null && !validDifficulty(data.difficulty))
     || (data.startPoints != null && !validStartPoints(data.mode, data.startPoints))
     || (data.autoPlayDifficulty != null && !validDifficulty(data.autoPlayDifficulty))
+    || (data.autoPlayMatchDifficulty !== undefined && typeof data.autoPlayMatchDifficulty !== 'boolean')
     || (data.autoExchangeThree != null && typeof data.autoExchangeThree !== 'boolean')) throw new Error('牌谱格式损坏或超出支持范围。');
   if (data.aiVersion != null && !(data.mode == null || data.mode === 'riichi' ? [1, 2, 3, 4, 5, 6, 7, AI_VERSION] : [2, 3, 4, 5, 6, 7, AI_VERSION]).includes(data.aiVersion)) {
     throw new Error('牌谱使用的电脑版本与当前游戏不兼容。');

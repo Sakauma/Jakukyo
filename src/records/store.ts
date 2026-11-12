@@ -90,6 +90,7 @@ export function validateSavedGame(value: unknown): SavedGame {
   if (value.startPoints !== undefined && !validStartPoints(value.mode as ModeId | undefined, value.startPoints)) throw new Error('牌谱的初始分与当前玩法不兼容。');
   if (value.difficulty != null && !['novice', 'standard', 'advanced', 'expert'].includes(String(value.difficulty))) throw new Error('牌谱的电脑难度无效。');
   if (value.autoPlayDifficulty !== undefined && (typeof value.autoPlayDifficulty !== 'string' || !['novice', 'standard', 'advanced', 'expert'].includes(value.autoPlayDifficulty))) throw new Error('牌谱的托管难度无效。');
+  if (value.autoPlayMatchDifficulty !== undefined && typeof value.autoPlayMatchDifficulty !== 'boolean') throw new Error('牌谱的托管跟随设置无效。');
   if (value.autoExchangeThree !== undefined && typeof value.autoExchangeThree !== 'boolean') throw new Error('牌谱的托管换三张设置无效。');
   if (value.rulesVersion !== undefined && value.rulesVersion !== 1 && value.rulesVersion !== 2) throw new Error('牌谱的规则版本无效。');
   if (value.aiVersion != null && (!Number.isInteger(value.aiVersion) || Number(value.aiVersion) < 1 || Number(value.aiVersion) > 100)) throw new Error('牌谱的电脑版本无效。');
@@ -103,6 +104,7 @@ export function validateSavedGame(value: unknown): SavedGame {
   if (value.startPoints !== undefined) save.startPoints = Number(value.startPoints);
   if (value.difficulty != null) save.difficulty = value.difficulty as SavedGame['difficulty'];
   if (value.autoPlayDifficulty !== undefined) save.autoPlayDifficulty = value.autoPlayDifficulty as SavedGame['autoPlayDifficulty'];
+  if (value.autoPlayMatchDifficulty !== undefined) save.autoPlayMatchDifficulty = value.autoPlayMatchDifficulty;
   if (value.autoExchangeThree !== undefined) save.autoExchangeThree = value.autoExchangeThree as boolean;
   if (value.aiVersion != null) save.aiVersion = Number(value.aiVersion);
   if (value.rulesVersion !== undefined) save.rulesVersion = value.rulesVersion;
@@ -306,11 +308,12 @@ export function createRecordStore(storage: StoragePort | null = safeStorage()) {
     const duplicate = [...records.values()].find(record => record.source === 'imported' && exactSave(record.save, save));
     if (duplicate) {
       // Future human autoplay preferences do not change historical decisions or identity.
-      // An older export without either preference must not erase a stored choice.
+      // An older export without a preference must not erase a stored choice.
       const autoPlayDifficulty = save.autoPlayDifficulty ?? duplicate.save.autoPlayDifficulty;
+      const autoPlayMatchDifficulty = save.autoPlayMatchDifficulty ?? duplicate.save.autoPlayMatchDifficulty;
       const autoExchangeThree = save.autoExchangeThree ?? duplicate.save.autoExchangeThree;
-      if (autoPlayDifficulty === duplicate.save.autoPlayDifficulty && autoExchangeThree === duplicate.save.autoExchangeThree) return duplicate;
-      const updated = { ...duplicate, updatedAt: isoNow(), save: { ...duplicate.save, autoPlayDifficulty, autoExchangeThree } };
+      if (autoPlayDifficulty === duplicate.save.autoPlayDifficulty && autoPlayMatchDifficulty === duplicate.save.autoPlayMatchDifficulty && autoExchangeThree === duplicate.save.autoExchangeThree) return duplicate;
+      const updated = { ...duplicate, updatedAt: isoNow(), save: { ...duplicate.save, autoPlayDifficulty, autoPlayMatchDifficulty, autoExchangeThree } };
       records.set(updated.id, updated); changed(true); return updated;
     }
     if ([...records.values()].filter(record => record.favorite).length >= MAX_RECORDS) throw new Error('收藏已达到 500 场，请先整理牌谱库后再导入。');

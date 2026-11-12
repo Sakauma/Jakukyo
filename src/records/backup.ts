@@ -72,7 +72,7 @@ function validateSave(value: unknown): void {
 
 function validatePreferences(value: unknown): void {
   requireValue(object(value), '设置');
-  const booleans = ['sound', 'bgm', 'autoSort', 'riichiHints', 'autoExchangeThree', 'winEffects', 'exchangeThree'];
+  const booleans = ['sound', 'bgm', 'autoSort', 'riichiHints', 'autoPlayMatchDifficulty', 'autoExchangeThree', 'winEffects', 'exchangeThree'];
   const volumes = ['musicVolume', 'masterVolume', 'effectsVolume', 'ambienceVolume'];
   for (const key of booleans) requireValue(value[key] === undefined || typeof value[key] === 'boolean', '设置');
   for (const key of volumes) requireValue(value[key] === undefined || number(value[key]) && value[key] >= 0 && value[key] <= 1, '音量设置');

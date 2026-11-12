@@ -181,8 +181,10 @@ export interface GameSnapshot {
   ronNotice?: RonNotice;
   selfWinNotice?: SelfWinNotice;
   autoPlay: boolean;
-  /** Human-only autoplay strategy; opponents keep difficulty. */
+  /** Effective human autoplay level after resolving the table's difficulty. */
   autoPlayDifficulty?: Difficulty;
+  /** Follow the table's AI difficulty and version; absent settings default to true. */
+  autoPlayMatchDifficulty?: boolean;
   /** Sichuan autoplay may submit exchange-three without human confirmation; defaults to false. */
   autoExchangeThree?: boolean;
   quickControls?: QuickControls;
@@ -220,6 +222,7 @@ export interface SessionOptions {
   speed?: number;
   autoPlay?: boolean;
   autoPlayDifficulty?: Difficulty;
+  autoPlayMatchDifficulty?: boolean;
   autoExchangeThree?: boolean;
   quickControls?: Partial<QuickControls>;
   /** Defaults to a hanchan; single-hand mode is useful for tests and practice. */
@@ -267,6 +270,7 @@ export interface SavedGame {
   rulesVersion?: 1 | 2;
   /** Last selected human autoplay level; historical actions remain explicit decisions. */
   autoPlayDifficulty?: Difficulty;
+  autoPlayMatchDifficulty?: boolean;
   autoExchangeThree?: boolean;
   variantOptions?: SessionOptions['variantOptions'];
   /** Exact engine progress for new saves; legacy saves omit this boundary. */
@@ -291,6 +295,7 @@ export interface RiichiSessionAPI {
   newGame(options?: SessionOptions): void;
   setAutoPlay(enabled: boolean): void;
   setAutoPlayDifficulty(difficulty: Difficulty): void;
+  setAutoPlayMatchDifficulty(enabled: boolean): void;
   setAutoExchangeThree(enabled: boolean): void;
   setQuickControls(controls: Partial<QuickControls>): void;
   setSpeed(milliseconds: number): void;
