@@ -13,7 +13,7 @@ export function ExperienceDialog({ title, onClose, children, dismissible = true 
   function keydown(event: KeyboardEvent<HTMLElement>) {
     if (event.key === 'Escape') { event.stopPropagation(); if (dismissible) onClose(); return; }
     if (event.key !== 'Tab') return;
-    const buttons = [...(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [href], [tabindex="0"]') ?? [])];
+    const buttons = [...(panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), summary, [href], [tabindex="0"]') ?? [])].filter(element => element.getClientRects().length > 0);
     const first = buttons[0], last = buttons.at(-1);
     if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) { event.preventDefault(); last?.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }

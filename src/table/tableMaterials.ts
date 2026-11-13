@@ -45,6 +45,11 @@ export const tileMatchOutline = createTileMatchOutline();
 export const tileMatchMaterial = new THREE.MeshBasicMaterial({ color: '#ffe08a', toneMapped: false });
 export const tileHoverMaterial = new THREE.MeshBasicMaterial({ color: '#c6e7d8', toneMapped: false });
 export const tileDropMaterial = new THREE.MeshBasicMaterial({ color: '#79dfb2', toneMapped: false });
+const latestDiscardShape = new THREE.Shape();
+latestDiscardShape.moveTo(-.065, .045); latestDiscardShape.lineTo(.065, .045); latestDiscardShape.lineTo(0, -.065); latestDiscardShape.closePath();
+export const latestDiscardMarker = new THREE.ShapeGeometry(latestDiscardShape);
+export const latestDiscardMarkerBorder = new THREE.MeshBasicMaterial({ color: '#214e48', toneMapped: false });
+export const latestDiscardMarkerFill = new THREE.MeshBasicMaterial({ color: '#a3f2e4', toneMapped: false });
 export const handHitGeometry = new THREE.BoxGeometry(1, 1, 1);
 export const handHitMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, colorWrite: false, depthWrite: false });
 export const tableBody = new RoundedBoxGeometry(14.15, .72, 13.55, 3, .19);
@@ -98,11 +103,11 @@ export function tileRestHeight(rotation: [number, number, number], scale: number
   return restHeights.get(key)!;
 }
 
-export function tileMaterials(theme: TableTheme, code?: string, faded = false) {
-  const key = `${theme.id}:${faded}`;
+export function tileMaterials(theme: TableTheme, code?: string, faded = false, river = false) {
+  const key = `${theme.id}:${faded}:${river}`;
   if (!palettes.has(key)) {
     const ivory = new THREE.MeshPhysicalMaterial({
-      color: faded ? '#c8c4b7' : theme.tileFace, roughness: .27, metalness: 0,
+      color: faded ? river ? '#efede5' : '#c8c4b7' : theme.tileFace, roughness: .27, metalness: 0,
       clearcoat: .48, clearcoatRoughness: .2, ior: 1.48, envMapIntensity: .72,
     });
     const back = new THREE.MeshPhysicalMaterial({ color: theme.tileBack, roughness: .3, metalness: 0, clearcoat: .5, clearcoatRoughness: .23, ior: 1.46, envMapIntensity: .65 });
@@ -118,9 +123,10 @@ export function tileMaterials(theme: TableTheme, code?: string, faded = false) {
       const surface = tileSurface(code, theme);
       faces.set(faceKey, new THREE.MeshPhysicalMaterial({
         map: surface.map, bumpMap: surface.bump, bumpScale: .009,
-        roughnessMap: surface.roughness, roughness: .64,
-        color: faded ? '#c3c0b5' : '#ffffff', metalness: 0,
-        clearcoat: .26, clearcoatRoughness: .25, ior: 1.48, envMapIntensity: .7,
+        roughnessMap: surface.roughness, roughness: river ? .82 : .64,
+        color: faded ? river ? '#f1efe9' : '#c3c0b5' : '#ffffff', metalness: 0,
+        clearcoat: river ? .08 : .26, clearcoatRoughness: river ? .45 : .25,
+        ior: 1.48, envMapIntensity: river ? .45 : .7,
       }));
     }
     face = faces.get(faceKey)!;

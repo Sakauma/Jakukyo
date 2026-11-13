@@ -55,7 +55,15 @@ export interface RoundView {
   dealer: number;
   wildcard?: TileCode;
 }
-export interface YakuView { name: string; han: number | string }
+/** Public, immutable references into this winner's hand at the instant of the win. */
+export interface ScoringEvidence {
+  text: string;
+  hand?: number[];
+  melds?: { index: number; tiles: number[] }[];
+  flowers?: number[];
+  kita?: boolean;
+}
+export interface YakuView { name: string; han: number | string; evidence?: ScoringEvidence }
 export interface SichuanOptions {
   version: 1 | 2;
   fanCap: 3 | 4 | 5 | 6 | 8 | 'none';
@@ -83,6 +91,9 @@ export interface WinnerView {
   /** Actual deltas for this winner only, in fixed player ID order; includes awarded pot/honba. */
   payments?: number[];
   sichuanScore?: SichuanScore;
+  /** Bonus tiles disclosed by this win, not a later continuing-hand snapshot. */
+  flowers?: TileCode[];
+  kita?: number;
 }
 export interface ConfirmedWinEvent {
   /** Unique within the running application, including repeated wins in a continuing hand. */
@@ -94,6 +105,17 @@ export interface ConfirmedWinEvent {
   /** True when blood battle/river continues after these wins. */
   continuing: boolean;
 }
+export interface RoundTransfer {
+  id: string;
+  kind: 'win' | 'concealed-kong' | 'added-kong' | 'open-kong' | 'kong-refund' | 'ready-payment' | 'flower-pig';
+  from: number;
+  to: number;
+  amount: number;
+  /** Original kong income being returned; the refund is a separate, reverse transfer. */
+  relatedId?: string;
+  winIndex?: number;
+  tile?: TileCode;
+}
 export interface RoundResult {
   kind: 'win' | 'draw' | 'abort' | 'match';
   title: string;
@@ -104,6 +126,8 @@ export interface RoundResult {
   scores: number[];
   ranks?: number[];
   tenpai?: boolean[];
+  /** Actual transfers for this hand only, already included in deltas. */
+  transfers?: RoundTransfer[];
 }
 export interface GameLogEntry { id: number; text: string; playerId?: number; tile?: TileCode }
 export type RiichiFuritenReason = 'discard' | 'temporary' | 'riichi-pass';
@@ -178,6 +202,8 @@ export interface GameSnapshot {
   message: string;
   log: GameLogEntry[];
   result: RoundResult | null;
+  /** Most recent actual discard this hand; called-away entries remain identifiable. */
+  lastDiscard?: { playerId: number; riverIndex: number } | null;
   /** Most recent confirmed, public win; cleared on the next deal. */
   latestWin?: ConfirmedWinEvent;
   ronNotice?: RonNotice;
@@ -330,7 +356,7 @@ export interface RiichiSessionAPI {
   setQuickControls(controls: Partial<QuickControls>): void;
   setSpeed(milliseconds: number): void;
   /** Pauses automatic progression during the current presentation without changing saved state. */
-  setPresentationPaused(paused: boolean): void;
+  setPresentationPaused(paused: boolean, owner?: 'round' | 'action'): void;
   exportReplay(): ReplayData;
   getSavedGame(): SavedGame;
   loadSavedGame(data: SavedGame): boolean;

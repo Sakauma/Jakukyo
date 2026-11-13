@@ -191,6 +191,8 @@ export class RiichiSession implements RiichiSessionAPI {
   private revision = 0;
   private paused = false;
   private presentationPaused = false;
+  private presentationOwners = new Set<'round' | 'action'>();
+  private lastDiscard: GameSnapshot['lastDiscard'] = null;
   private presentationReplies: Array<() => void> = [];
   private finished = false;
   private disposed = false;
@@ -216,6 +218,8 @@ export class RiichiSession implements RiichiSessionAPI {
   private initialize(options: SessionOptions, checkpoint?: EndlessCheckpoint): void {
     this.cancelTimer();
     this.presentationReplies = [];
+    this.presentationOwners.clear(); this.presentationPaused = false;
+    this.lastDiscard = null;
     this.botService.cancel();
     this.tanyaoService.dispose();
     this.autoPlayService.cancel(); this.autoPlayRequestVersion++;
@@ -414,10 +418,14 @@ export class RiichiSession implements RiichiSessionAPI {
     const id = typeof data.l === 'number' ? board.player_id[data.l] : undefined;
     this.replayLabel = type === 'zimo' || type === 'gangzimo' ? `${NAMES[id!]}${type === 'gangzimo' ? '杠后补牌' : '摸牌'}` : '';
     if (type === 'qipai') {
+      this.lastDiscard = null;
       this.result = null;
       this.latestWin = undefined;
       this.append(`${WINDS[data.zhuangfeng]} ${data.jushu + 1} 局 · ${data.changbang} 本场`);
-    } else if (type === 'dapai') this.append(`${NAMES[id!]}${data.p.includes('*') ? '立直，打出' : '打出'}${tileLabel(data.p)}`, id, data.p.slice(0, 2));
+    } else if (type === 'dapai') {
+      this.lastDiscard = { playerId: id!, riverIndex: board.he[data.l]._pai.length - 1 };
+      this.append(`${NAMES[id!]}${data.p.includes('*') ? '立直，打出' : '打出'}${tileLabel(data.p)}`, id, data.p.slice(0, 2));
+    }
     else if (type === 'fulou') {
       const meld = meldView(data.m, '');
       this.append(`${NAMES[id!]}${meld.type === 'chi' ? '吃' : meld.type === 'pon' ? '碰' : '明杠'} ${meld.tiles.map(tileLabel).join(' ')}`, id);
@@ -518,11 +526,14 @@ export class RiichiSession implements RiichiSessionAPI {
     if (!enabled) { this.autoPlayRequestVersion++; this.autoPlayService.cancel(); this.tanyaoService.cancel('autoplay'); }
     this.cancelTimer(); this.publish(); this.schedule();
   }
-  setPresentationPaused(paused: boolean): void {
-    if (this.presentationPaused === paused || this.disposed) return;
-    this.presentationPaused = paused;
+  setPresentationPaused(paused: boolean, owner: 'round' | 'action' = 'round'): void {
+    if (this.disposed) return;
+    if (paused) this.presentationOwners.add(owner); else this.presentationOwners.delete(owner);
+    const next = this.presentationOwners.size > 0;
+    if (this.presentationPaused === next) return;
+    this.presentationPaused = next;
     this.cancelTimer();
-    if (!paused) {
+    if (!next) {
       const replies = this.presentationReplies; this.presentationReplies = [];
       for (const reply of replies) reply();
     }
@@ -580,6 +591,7 @@ export class RiichiSession implements RiichiSessionAPI {
       turn: board.lunban < 0 ? board.player_id[0] : board.player_id[board.lunban], humanId: 0, actions,
       message: this.finished ? '对局结束，可以再开一局。' : this.paused ? this.result?.title || '本局结束' : ownDiscard ? '轮到你了 · 选择一张手牌打出' : actions.length ? '可以鸣牌或和牌 · 请选择操作' : `${NAMES[board.player_id[Math.max(0, board.lunban)]]}正在思考…`,
       log: [...this.log], result: this.paused || this.finished ? this.result ? structuredClone(this.result) : null : null,
+      lastDiscard: this.lastDiscard ? { ...this.lastDiscard } : null,
       ...(this.latestWin ? { latestWin: structuredClone(this.latestWin) } : {}),
       ...(this.ronNotice ? { ronNotice: structuredClone(this.ronNotice) } : {}),
       autoPlay: this.options.autoPlay, autoPlayDifficulty: resolveAutoPlayDifficulty(this.options), autoPlayMatchDifficulty: this.options.autoPlayMatchDifficulty, autoExchangeThree: this.options.autoExchangeThree, quickControls: { ...this.quickControls }, speed: this.options.speed, revision: ++this.revision, shanten: Number.isFinite(shanten) ? shanten : null,

@@ -93,7 +93,13 @@ export function createTableMotionController() {
         }
         releasedOrigin = null;
       }
-      for (const cue of cues) if (cue.kind === 'discard') latestDiscard = { seat: cue.seat, sourceIndex: cue.riverIndex! };
+      if (snapshot?.lastDiscard !== undefined) {
+        latestDiscard = snapshot.lastDiscard ? { seat: snapshot.lastDiscard.playerId, sourceIndex: snapshot.lastDiscard.riverIndex } : null;
+      } else {
+        const discards = cues.filter(cue => cue.kind === 'discard');
+        if (discards.length === 1) latestDiscard = { seat: discards[0].seat, sourceIndex: discards[0].riverIndex! };
+        else if (discards.length > 1) latestDiscard = null;
+      }
       if (latestDiscard) {
         const marked = snapshot?.players.find(player => player.id === latestDiscard!.seat)?.discards[latestDiscard.sourceIndex];
         if (!marked || marked.called) latestDiscard = null;

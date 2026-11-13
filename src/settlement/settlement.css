@@ -36,6 +36,8 @@
 .settlement-hand{padding:16px 18px 18px;border:1px solid var(--border-color);border-radius:9px;background:color-mix(in srgb,var(--surface) 58%,var(--felt))}
 .settlement-hand-row{display:flex;align-items:flex-start;flex-wrap:wrap;gap:15px 18px;margin-top:17px;min-width:0}
 .settlement-hand .tile-portrait{--tile-width:38px}
+.settlement-evidence-tile{position:relative;display:inline-flex;flex-shrink:0;border-radius:4px}
+.settlement-evidence-tile.is-highlighted{outline:2px solid #35aaa9;outline-offset:1px;box-shadow:0 0 0 4px #35aaa940;z-index:1}
 .settlement-concealed-tiles{display:flex;align-items:flex-end;flex-wrap:wrap;gap:3px;padding-bottom:19px;max-width:100%;min-width:0}
 .settlement-winning-tile{display:flex;flex-direction:column;align-items:center;gap:7px;padding:0 4px;flex-shrink:0}
 .settlement-winning-tile .tile-portrait.winning{margin-left:0}
@@ -51,18 +53,29 @@
 .settlement-indicators .tile-portrait{--tile-width:25px}
 .settlement-detail-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(265px,.85fr);gap:27px;margin:21px 0 25px;align-items:start}
 .settlement-yaku ul{list-style:none;padding:0;margin:10px 0 0}
-.settlement-yaku li{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid color-mix(in srgb,var(--border-color) 58%,transparent);font-size:13px;line-height:1.6;transition:opacity .2s ease,background .2s ease,box-shadow .2s ease}
+.settlement-yaku li{border-bottom:1px solid color-mix(in srgb,var(--border-color) 58%,transparent);font-size:13px;line-height:1.6;transition:opacity .2s ease,background .2s ease,box-shadow .2s ease}
 .settlement-yaku li.yaku-pending{opacity:.38}
 .settlement-yaku li.yaku-revealed{opacity:1;background:linear-gradient(90deg,color-mix(in srgb,var(--gold) 9%,transparent),transparent 80%);box-shadow:-8px 0 0 color-mix(in srgb,var(--gold) 9%,transparent)}
 .presentation-complete .settlement-yaku li{background:none;box-shadow:none}
+.settlement-yaku li.yaku-selected{background:color-mix(in srgb,var(--gold) 7%,transparent);box-shadow:none}
+.settlement-yaku .settlement-yaku-button{display:flex;align-items:baseline;gap:12px;width:100%;min-height:44px;padding:10px 0;border:0;border-radius:3px;background:transparent;color:var(--cream);font:inherit;text-align:left;white-space:normal;cursor:pointer}
+.settlement-yaku-button>span:first-child{flex:1;min-width:0;overflow-wrap:anywhere}
+.settlement-yaku-button>strong{font-size:12px;font-weight:500;color:var(--gold);white-space:nowrap;font-variant-numeric:tabular-nums}
+.settlement-yaku-toggle{width:14px;flex-shrink:0;text-align:center;color:var(--muted);font-size:16px;line-height:1}
+.settlement-yaku .settlement-yaku-button:not(:disabled):hover,.settlement-yaku .yaku-selected>.settlement-yaku-button{color:var(--gold)}
+.settlement-yaku .settlement-yaku-button:disabled{opacity:1;cursor:default}
+.settlement-scoring-explanation{display:flex;align-items:flex-start;gap:10px;padding:0 0 12px}
+.settlement-scoring-explanation>p{flex:1;min-width:0;margin:0;padding:3px 0;color:var(--cream);font-size:13px;line-height:1.75;overflow-wrap:anywhere}
+.settlement-yaku .settlement-scoring-explanation>button{display:grid;place-items:center;flex-shrink:0;width:32px;height:32px;padding:0;border:1px solid var(--border-color);border-radius:5px;background:transparent;color:var(--muted);font-size:20px;line-height:1;cursor:pointer}
+.settlement-scoring-explanation>button:hover{color:var(--cream);border-color:var(--gold)}
+.settlement-yaku-button:focus-visible,.settlement-scoring-explanation>button:focus-visible,.settlement-transfers>summary:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media(pointer:coarse){.settlement-yaku .settlement-scoring-explanation>button{width:44px;height:44px}}
 .settlement-footer-actions{display:flex;align-items:center;justify-content:flex-end;gap:15px}
 .settlement-skip{display:flex;align-items:center;gap:7px;border:1px solid var(--border-color);border-radius:5px;padding:9px 11px;background:transparent;color:var(--cream);font-size:11px;white-space:nowrap}
 .settlement-skip:not(:disabled):hover{border-color:var(--gold);color:var(--gold);background:var(--raised)}
 .settlement-skip:disabled{border-color:transparent;color:var(--muted);cursor:default}
 .settlement-skip kbd{font:9px system-ui;color:var(--muted);border:1px solid var(--border-color);border-radius:3px;padding:1px 4px}
 @media(max-width:640px){.settlement-footer-actions{gap:7px}.settlement-skip{padding:8px;font-size:10px}.settlement-skip kbd{display:none}}
-.settlement-yaku li>span{color:var(--cream);overflow-wrap:anywhere}
-.settlement-yaku li>strong{font-size:12px;font-weight:500;color:var(--gold);white-space:nowrap;font-variant-numeric:tabular-nums}
 .settlement-muted-copy{font-size:11px;line-height:1.8;color:var(--muted)}
 .settlement-value{padding:17px 18px;border:1px solid var(--border-color);border-radius:9px;background:color-mix(in srgb,var(--surface) 37%,var(--panel))}
 .settlement-value-top{display:flex;gap:16px;align-items:center;min-width:0}
@@ -88,6 +101,24 @@
 .settlement-panel .is-even{color:var(--muted)}
 .settlement-ledger{padding-top:19px;border-top:1px solid var(--border-color)}
 .settlement-score-cards{display:grid;grid-template-columns:repeat(var(--seat-count,4),minmax(0,1fr));gap:10px;margin-top:12px}
+.settlement-transfers{margin-top:15px;border-top:1px solid var(--border-color)}
+.settlement-transfers>summary{display:flex;align-items:center;gap:10px;min-height:44px;padding:13px 0;list-style:none;border-radius:3px;color:var(--cream);font-size:13px;cursor:pointer}
+.settlement-transfers>summary::-webkit-details-marker{display:none}
+.settlement-transfers>summary::before{content:'';width:6px;height:6px;flex-shrink:0;border-right:1.5px solid var(--gold);border-bottom:1.5px solid var(--gold);transform:rotate(-45deg);margin:0 3px 0 2px}
+.settlement-transfers[open]>summary::before{transform:rotate(45deg);margin-bottom:3px}
+.settlement-transfers>summary:hover{color:var(--gold)}
+.settlement-transfers>summary>small{margin-left:auto;color:var(--muted);font-size:12px}
+.settlement-transfers>ol{list-style:none;margin:0;padding:0;border-top:1px solid var(--border-color)}
+.settlement-transfers li{display:grid;grid-template-columns:24px minmax(0,1fr) auto;gap:12px;align-items:start;padding:13px 0;border-bottom:1px solid color-mix(in srgb,var(--border-color) 60%,transparent);font-size:13px;line-height:1.6}
+.settlement-transfer-number{padding-top:1px;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.settlement-transfer-kind,.settlement-transfer-route{display:flex;flex-wrap:wrap;gap:5px 9px;min-width:0;overflow-wrap:anywhere}
+.settlement-transfer-kind>strong{color:var(--cream);font-weight:500}
+.settlement-transfer-kind>span{color:var(--muted);font-size:12px}
+.settlement-transfer-route{margin-top:3px;color:var(--cream)}
+.settlement-transfer-route>span:nth-child(2){color:var(--gold)}
+.settlement-transfer-related{display:block;margin-top:4px;color:var(--muted);font-size:12px}
+.settlement-transfer-amount{color:var(--gold);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.settlement-transfer-amount>small{margin-left:5px;color:var(--muted);font-size:11px;font-weight:400}
 .settlement-score-card{position:relative;min-width:0;padding:14px 14px 13px;border:1px solid var(--border-color);border-radius:8px;background:var(--surface)}
 .settlement-score-card.is-you{border-color:color-mix(in srgb,var(--gold) 75%,var(--border-color));background:color-mix(in srgb,var(--gold) 7%,var(--surface))}
 .settlement-score-card.is-first{border-color:var(--gold);background:linear-gradient(140deg,color-mix(in srgb,var(--gold) 17%,var(--surface)),var(--surface))}

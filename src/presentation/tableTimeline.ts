@@ -70,6 +70,13 @@ export function motionDuration(kind: TableMotionKind, speed: number, reduced = f
   return Math.min(normal[kind], Math.max(0, speed * .78));
 }
 
+/** Add only the missing observation time; the normal engine step already waits for speed. */
+export function actionObservationDelay(cues: readonly TableMotionCue[], speed: number, reduced = false): number {
+  if (reduced || speed <= 250 || !Number.isFinite(speed)) return 0;
+  const windows: Partial<Record<TableMotionKind, number>> = { chi: 800, pon: 800, kan: 850, riichi: 850 };
+  return Math.max(0, ...cues.map(cue => (windows[cue.kind] ?? 0) - speed));
+}
+
 // Existing sample contact offsets, in milliseconds. Keep the sound design intact.
 const contacts: Record<TableMotionKind, number[]> = {
   draw: [105], discard: [0], chi: [45, 95, 150], pon: [0, 52, 84], kan: [0, 45, 98, 168], riichi: [100], kita: [174],

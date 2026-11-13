@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { GameSnapshot, HandTile } from '../game/types';
 import { feltSurface, woodSurface } from './tileTextures';
-import { tileBody, tileBack, tileMaterials, tileRestHeight, contactPlane, tileMatchOutline, tileMatchMaterial, tileHoverMaterial, tileDropMaterial, handHitBox, alignHandHitBox, handHitGeometry, handHitMaterial, tableBody, tableInlay, tableFelt, longRail, shortRail, centerBase } from './tableMaterials';
+import { tileBody, tileBack, tileMaterials, tileRestHeight, contactPlane, tileMatchOutline, tileMatchMaterial, tileHoverMaterial, tileDropMaterial, latestDiscardMarker, latestDiscardMarkerBorder, latestDiscardMarkerFill, handHitBox, alignHandHitBox, handHitGeometry, handHitMaterial, tableBody, tableInlay, tableFelt, longRail, shortRail, centerBase } from './tableMaterials';
 import { getTheme, tableSeat } from './themes';
 import type { TableTheme } from './themes';
 import type { WinEffect } from '../effects/winEffects';
@@ -32,13 +32,13 @@ interface TileProps {
   scale?: number; stackHeight?: number; selected?: boolean; interactive?: boolean; faded?: boolean; animatePosition?: boolean; onClick?: () => void;
   placement?: TilePlacement;
   round?: { phase: RoundPresentation | null; hand?: boolean; seat?: number; index?: number; originZ?: number; revealFrom?: [number, number, number] };
-  motion?: TileMotion; reducedMotion?: boolean; matched?: boolean; candidate?: boolean;
+  motion?: TileMotion; reducedMotion?: boolean; matched?: boolean; candidate?: boolean; river?: boolean; latestDiscard?: boolean;
   handInput?: { context: HandDragContext | null; onPreview: (preview: HandDragPreview | null) => void;
     onDrop: (preview: HandDragPreview, pose: [number, number, number], rotation: [number, number, number], scale: number) => boolean };
 }
 
 const noRaycast = () => {};
-function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHeight = 0, selected = false, interactive = false, faded = false, animatePosition = false, onClick, motion, reducedMotion = false, matched = false, candidate = false, handInput, placement, round }: TileProps) {
+function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHeight = 0, selected = false, interactive = false, faded = false, animatePosition = false, onClick, motion, reducedMotion = false, matched = false, candidate = false, river = false, latestDiscard = false, handInput, placement, round }: TileProps) {
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false), [dropValid, setDropValid] = useState(false);
   const [gesture] = useState(() => createHandDragController(HAND_ROW_Z - .60));
@@ -47,7 +47,7 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
   const capturedWatch = useRef<{ cleanup: () => void } | null>(null);
   const fallbackTap = useRef<{ cleanup: () => void } | null>(null);
   const suppressClick = useRef(false);
-  const materials = useMemo(() => tileMaterials(theme, tile, faded), [tile, theme, faded]);
+  const materials = useMemo(() => tileMaterials(theme, tile, faded, river), [tile, theme, faded, river]);
   const lying = Math.abs(rotation[0]) > 1;
   const restY = tileRestHeight(rotation, scale) + stackHeight;
   const ref = useRef<THREE.Group>(null);
@@ -202,7 +202,11 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
     <group ref={ref} position={[0, restY, 0]} scale={scale}>
     <mesh geometry={tileBack} material={selected ? materials.selected : materials.back} castShadow receiveShadow />
     <mesh geometry={tileBody} material={materials.body} castShadow receiveShadow />
-    {(matched || selected || hover && interactive || dragging) && <mesh position={[0, 0, .191]} geometry={tileMatchOutline} material={dragging && dropValid ? tileDropMaterial : selected || matched || dragging ? tileMatchMaterial : tileHoverMaterial} raycast={noRaycast} />}
+    {(matched || selected || hover && interactive || dragging) && <mesh position={[0, 0, .191]} scale={river ? [.96, .97, 1] : undefined} geometry={tileMatchOutline} material={dragging && dropValid ? tileDropMaterial : selected || matched || dragging ? tileMatchMaterial : tileHoverMaterial} raycast={noRaycast} />}
+    {latestDiscard && <group position={[-.185, .3, .194]}>
+      <mesh geometry={latestDiscardMarker} material={latestDiscardMarkerBorder} raycast={noRaycast} />
+      <mesh position={[0, 0, .001]} scale={.74} geometry={latestDiscardMarker} material={latestDiscardMarkerFill} raycast={noRaycast} />
+    </group>}
     </group>
     {(selected || candidate) && <mesh position={[0, .092, .27]} rotation={[-Math.PI / 2, 0, 0]} scale={[.57 * scale, selected ? .11 : .05, 1]} geometry={contactPlane} material={materials.marker} raycast={noRaycast} />}
     </group>
@@ -415,7 +419,7 @@ function Scene({ snapshot, selectedId, selectedIds = [], interactiveIds, display
       </group>;
     })}
     {(snapshot?.players ?? []).map(player => <group key={`${motionFrame.identity}-public-${player.id}`} rotation={[0, tableSeat(player.id, playerCount) * Math.PI / 2, 0]}>
-      {riverLayout(player.discards).items.map(discard => <Tile key={discard.sourceIndex} theme={theme} tile={discard.tile} position={discard.position} rotation={discard.rotation} scale={discard.scale} faded={discard.tsumogiri} matched={riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.pageIndices.includes(discard.sourceIndex)} animatePosition motion={motionFrame.motions.get(riverMotionKey(player.id, discard.sourceIndex))} reducedMotion={reducedMotion} placement={tilePlacement(motionFrame.placementSeed, riverMotionKey(player.id, discard.sourceIndex), 'river')} round={{ phase: roundPresentation }} />)}
+      {riverLayout(player.discards).items.map(discard => <Tile key={discard.sourceIndex} theme={theme} tile={discard.tile} position={discard.position} rotation={discard.rotation} scale={discard.scale} river latestDiscard={motionFrame.latestDiscard?.seat === player.id && motionFrame.latestDiscard.sourceIndex === discard.sourceIndex} faded={discard.tsumogiri} matched={riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.pageIndices.includes(discard.sourceIndex)} animatePosition motion={motionFrame.motions.get(riverMotionKey(player.id, discard.sourceIndex))} reducedMotion={reducedMotion} placement={tilePlacement(motionFrame.placementSeed, riverMotionKey(player.id, discard.sourceIndex), 'river')} round={{ phase: roundPresentation }} />)}
       {seatLayout(player.id === 0 ? ownHand : Array.from({ length: player.revealedHand?.length ?? player.concealedCount }, () => ({ drawn: false })), player.melds, player.id === 0, (snapshot?.handSize ?? 13) > 14, !!snapshot?.hideOpponentConcealedKongs && player.id !== snapshot.humanId).melds.map(tile => <Tile key={tile.key} theme={theme} tile={tile.tile} position={tile.position} rotation={tile.rotation} scale={tile.scale} matched={!!tile.tile && !!riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.meldIndices.some(index => index.meldIndex === tile.meldIndex && index.tileIndex === tile.tileIndex)} animatePosition motion={motionFrame.motions.get(meldMotionKey(player.id, tile.meldIndex, tile.tileIndex))} reducedMotion={reducedMotion} round={{ phase: roundPresentation }} />)}
       {Array.from({ length: player.kita ?? 0 }, (_, i) => <Tile key={`bonus-${i}`} theme={theme} tile="z4" position={bonusPosition(i)} rotation={[-Math.PI / 2, 0, 0]} scale={.58} motion={motionFrame.motions.get(bonusMotionKey(player.id, (player.flowers?.length ?? 0) + i))} reducedMotion={reducedMotion} round={{ phase: roundPresentation }} />)}
       {player.riichi && <RiichiStick motion={motionFrame.motions.get(stickMotionKey(player.id))} reduced={reducedMotion} phase={roundPresentation} />}

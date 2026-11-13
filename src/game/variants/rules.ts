@@ -8,6 +8,7 @@ import type { Decomposition, HandSearchBudget } from './hand';
 import { normalizeSichuanOptions } from './sichuan';
 import { noYakuReason } from '../ronNotice';
 import { REGIONAL_START_POINTS } from '../startingPoints';
+import { mcrEvidence, sichuanEvidence } from '../scoringEvidence';
 
 export interface RuleProfile {
   id:ModeId; players:3|4; sets:4|5; honors:boolean; flowers:boolean; chi:boolean;
@@ -38,6 +39,8 @@ export interface ScoreContext {
   wildcard?:string;lastTile?:boolean;kongDraw?:boolean;robbingKong?:boolean;
   dora?:string[];ura?:string[];visibleWinningCopies?:number;firstDraw?:boolean;
   rulesVersion?:1|2;sichuan?:SichuanOptions;kongDiscard?:boolean;heavenlyWin?:'heaven'|'earth';
+  /** Explanation references are captured at an actual win, never during AI search. */
+  captureEvidence?:boolean;
 }
 export interface HandScore {fan:number;fu:number;base:number;yakuman:number;yaku:YakuView[];payments?:number[];birds?:string[];sichuanScore?:SichuanScore}
 const ceil100=(n:number)=>Math.ceil(n/100)*100;
@@ -94,10 +97,15 @@ export function evaluateMcrHand(c: ScoreContext): McrHandEvaluation | null {
     if (!result.isHu) return null;
     const nonFlowerFan = result.fans.filter((fan: any) => fan.fanId !== GBConstants.FAN_HUAPAI)
       .reduce((total: number, fan: any) => total + fan.score, 0);
+    let yaku:YakuView[] = result.fans.map((fan: any) => ({ name: GBConstants.FAN_NAME[fan.fanId], han: fan.score }));
+    if(c.captureEvidence){
+      // Explanatory metadata must never change the already-confirmed scoring result.
+      try { yaku=mcrEvidence(result,{hand:[...c.player.hand,...(c.selfDraw?[]:[c.winningTile])],melds:c.player.melds,flowers:c.player.flowers,winningTile:c.winningTile},GBConstants.FAN_NAME,GBConstants.ZuhelongBitmap); } catch { /* Older scorer shapes retain ordinary scoring rows. */ }
+    }
     return {
       fan: result.totalFan,
       nonFlowerFan,
-      yaku: result.fans.map((fan: any) => ({ name: GBConstants.FAN_NAME[fan.fanId], han: fan.score })),
+      yaku,
     };
   } catch {
     return null;
@@ -180,7 +188,8 @@ function sichuanV2Score(c:ScoreContext,forms:Decomposition[],all:string[],option
   }
   const chosen=best!;
   const effectiveFan=options.fanCap==='none'?chosen.fan:Math.min(options.fanCap,chosen.fan),multiplier=2**effectiveFan;
-  return {fan:chosen.fan,fu:0,base:multiplier,yakuman:0,yaku:chosen.yaku,
+  const yaku=c.captureEvidence?sichuanEvidence(chosen.yaku,{hand:[...c.player.hand,...(c.selfDraw?[]:[c.winningTile])],melds:c.player.melds,winningTile:c.winningTile},c.profile.id):chosen.yaku;
+  return {fan:chosen.fan,fu:0,base:multiplier,yakuman:0,yaku,
     sichuanScore:{fanCap:options.fanCap,effectiveFan,multiplier,selfDrawBonus:c.selfDraw&&options.selfDraw==='base'?1:0}};
 }
 
@@ -216,7 +225,7 @@ export function scoreHand(c:ScoreContext,reasons?:string[],analysisBudget?:HandS
     const roots=counters.filter(n=>n===4).length;if(roots)add('根',roots);
     if(c.kongDraw)add('杠上花',1);if(c.robbingKong)add('抢杠胡',1);if(c.lastTile)add('海底',1);
     if(!fan)yaku.push({name:'平胡',han:0});const effectiveFan=Math.min(4,fan),base=2**effectiveFan;
-    return {fan,fu:0,base,yakuman:0,yaku,sichuanScore:{fanCap:4,effectiveFan,multiplier:base,selfDrawBonus:c.selfDraw?1:0}};
+    return {fan,fu:0,base,yakuman:0,yaku:c.captureEvidence?sichuanEvidence(yaku,{hand:tiles,melds:player.melds,winningTile:c.winningTile},p.id):yaku,sichuanScore:{fanCap:4,effectiveFan,multiplier:base,selfDrawBonus:c.selfDraw?1:0}};
   }
   if(p.id==='hongkong'){
     if(orphan)add('十三幺',13);else if(dragon===3)add('大三元',10);else if(wind===4)add('大四喜',10);else if(allHonors)add('字一色',10);else if(terminal)add('混老头',10);else{
