@@ -1,6 +1,6 @@
 import { AI_VERSION, validDifficulty } from './ai/types';
 import { MODES } from './catalog';
-import type { GameSnapshot, ReplayFrame, SavedGame } from './types';
+import type { GameSnapshot, ReplayDecisionPoint, ReplayFrame, SavedGame } from './types';
 import { validStartPoints } from './startingPoints';
 import { validEndlessCheckpoint } from './endlessCheckpoint';
 import { validSichuanOptions } from './variants/sichuan';
@@ -20,7 +20,7 @@ export function validateReplayData(data: SavedGame): void {
     || (data.autoPlayDifficulty != null && !validDifficulty(data.autoPlayDifficulty))
     || (data.autoPlayMatchDifficulty !== undefined && typeof data.autoPlayMatchDifficulty !== 'boolean')
     || (data.autoExchangeThree != null && typeof data.autoExchangeThree !== 'boolean')) throw new Error('牌谱格式损坏或超出支持范围。');
-  if (data.aiVersion != null && !(data.mode == null || data.mode === 'riichi' ? [1, 2, 3, 4, 5, 6, 7, AI_VERSION] : [2, 3, 4, 5, 6, 7, AI_VERSION]).includes(data.aiVersion)) {
+  if (data.aiVersion != null && !(data.mode == null || data.mode === 'riichi' ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, AI_VERSION] : [2, 3, 4, 5, 6, 7, 8, 9, 10, AI_VERSION]).includes(data.aiVersion)) {
     throw new Error('牌谱使用的电脑版本与当前游戏不兼容。');
   }
   validateBotReplay(data);
@@ -56,10 +56,14 @@ export function validateBotReplay(data: SavedGame): void {
     throw new Error('模型操作记录缺少对应的模型身份。');
   }
   if (data.botDecisions.some(decision => decision.source === 'riichi-model-hybrid') && (data.mode != null && data.mode !== 'riichi' || !data.aiModel)) throw new Error('立直模型操作记录缺少对应模型身份。');
+  const sichuanModel = data.mode === 'sichuan-blood' || data.mode === 'sichuan-river';
   if (data.botDecisions.some(decision => decision.source === 'sichuan-model-hybrid')
-    && (data.mode !== 'sichuan-blood' || (data.aiVersion ?? 0) < 8 || !data.aiModel)) throw new Error('四川模型操作记录缺少对应模型身份。');
-  if (data.aiModel != null && (data.mode != null && !['mcr', 'riichi', 'sichuan-blood'].includes(data.mode) || typeof data.aiModel.id !== 'string' || data.aiModel.id.length > 100
-    || !/^[0-9a-f]{64}$/i.test(data.aiModel.sha256) || data.aiModel.featureVersion !== (data.mode === 'mcr' || data.mode === 'sichuan-blood' ? 1 : 2) || data.aiModel.policyVersion !== 1)) {
+    && (!sichuanModel || (data.aiVersion ?? 0) < (data.mode === 'sichuan-river' ? 9 : 8) || !data.aiModel)) throw new Error('四川模型操作记录缺少对应模型身份。');
+  const aiVersion = data.aiVersion ?? 0;
+  const featureVersion = sichuanModel ? aiVersion >= 10 ? 3 : aiVersion >= 9 ? 2 : 1 : data.mode === 'mcr' ? 1 : 2;
+  if (data.aiModel != null && (data.mode != null && !['mcr', 'riichi', 'sichuan-blood', 'sichuan-river'].includes(data.mode)
+    || data.mode === 'sichuan-river' && (data.aiVersion ?? 0) < 9 || typeof data.aiModel.id !== 'string' || data.aiModel.id.length > 100
+    || !/^[0-9a-f]{64}$/i.test(data.aiModel.sha256) || data.aiModel.featureVersion !== featureVersion || data.aiModel.policyVersion !== 1)) {
     throw new Error('牌谱模型身份无效。');
   }
 }
@@ -77,6 +81,24 @@ export function appendReplayFrame(frames: ReplayFrame[], snapshot: GameSnapshot,
     roundKey: `${snapshot.mode ?? 'riichi'}:${snapshot.round.wind}:${snapshot.round.hand}:${snapshot.round.honba}:${snapshot.round.dealer}${snapshot.round.sequence == null ? '' : `:${snapshot.round.sequence}`}`,
     allHands: structuredClone(hands),
   });
+}
+
+export function appendReplayDecision(frames: ReplayFrame[], decision: ReplayDecisionPoint): void {
+  const frame = frames.at(-1);
+  const actual = decision.actions.find(action => action.key === decision.actualKey);
+  if (!frame || !actual || decision.actions.length < 2
+    || !['discard', 'riichi', 'chi', 'pon', 'kan', 'pass', 'kita', 'ron', 'tsumo'].includes(actual.type)) return;
+  const captured = structuredClone(decision);
+  if (captured.input.kind === 'regional') {
+    // Older AI inputs omitted this public flag. Read only the action's before-frame,
+    // so current analysis of blood-flow replays cannot see later wins.
+    const publicPlayers = new Map(frame.snapshot.players.map(player => [player.id, player]));
+    captured.input.input.observation.players = captured.input.input.observation.players.map(player => {
+      const hasWon = publicPlayers.get(player.id)?.hasWon;
+      return typeof hasWon === 'boolean' ? { ...player, hasWon } : player;
+    });
+  }
+  frame.decision = captured;
 }
 
 export function finishReplayFrames(frames: ReplayFrame[]): ReplayFrame[] {

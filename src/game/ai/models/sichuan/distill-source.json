@@ -1,0 +1,86 @@
+{
+  "id": "jakukyo-sichuan-proposal-distill-ppo-20261113",
+  "trainingBaseline": "1d22e3c8e44dcd1e3cb20fe877776bcaee7408fd",
+  "checkpoint": "distill-ppo.pt",
+  "parametersSha256": "28a0df0a041835ef2335f78a6563e487338e32b446be1654591b96017daf21cd",
+  "featureVersion": 3,
+  "policyVersion": 1,
+  "proposalVersion": 1,
+  "architecture": [476, 128, 128, 138],
+  "scope": {
+    "modes": ["sichuan-blood", "sichuan-river"],
+    "rulesVersion": 2,
+    "version": 2,
+    "fanCaps": [3, 4, 5, 6, 8, "none"],
+    "selfDraw": ["base", "fan"],
+    "menqingZhongzhang": [false, true],
+    "exchangeThree": [false, true],
+    "configurations": 96,
+    "difficulties": ["advanced", "expert"]
+  },
+  "training": {
+    "warmParametersSha256": "d6249b676f70b64595fc722999779d683fe39a0a5f222e6d410301436b231e46",
+    "teacher": {
+      "version": 1,
+      "input": "Acting hand, legal actions and a decision-time public-information snapshot.",
+      "target": "Score the actual execution of each fixed runtime proposal. Equivalent no-op executions have zero advantage.",
+      "commonPublicDrawTrials": 16,
+      "ownDrawDepth": 2,
+      "nodesPerExecutedGroup": 128000,
+      "maximumExecutedGroups": 4,
+      "sampling": "At most four public wall-count stages per game. Entirely equivalent execution groups do not consume a sample slot.",
+      "privateWallOrOpponentHandInput": false
+    },
+    "distillation": {
+      "trainGames": 960,
+      "validationGames": 320,
+      "trainStates": 428,
+      "validationStates": 145,
+      "nonAnchorTrainTargets": 116,
+      "loss": "Grouped cross entropy over equivalent best executions. Critic excludes teacher targets.",
+      "trainable": "Shared trunk and actor head, including the four public hasWon input columns.",
+      "epochs": 30,
+      "selectedEpoch": 4,
+      "warmValidationGameMeanTeacherRegret": 0.2787794264467086,
+      "selectedValidationGameMeanTeacherRegret": 0.2710096271025673,
+      "parametersSha256": "e4fe3192f4df0089c12f3389cbc3a69d1ccf60aa2307d5f258d22090a0af9482"
+    },
+    "ppo": {
+      "games": 800,
+      "policySamples": 3683,
+      "epochs": 4,
+      "steps": 32,
+      "behavior": "categorical",
+      "opponents": "Three formal AI8 players with one rotating learner seat.",
+      "rewardVersion": 3,
+      "reward": "net/32",
+      "gamma": 1,
+      "anchorCoefficient": 0.02,
+      "anchorData": "New proposal distillation labels.",
+      "valueLoss": "Huber beta=1 on actual complete-hand returns.",
+      "gradientNorm": 0.5,
+      "logProbabilityMaximumError": 0.000001430511474609375,
+      "checkpointRestoreExact": true
+    },
+    "preparation": "Existing exchange-three and missing-suit policies execute before the public decisions used for training."
+  },
+  "deployment": {
+    "firstAiVersion": 11,
+    "proposalVersion": 1,
+    "proposal": "One masked neural proposal, including the fixed anchor as no-op, followed by the same bounded runtime search used during training.",
+    "rootNodes": 1200,
+    "advanced": { "candidates": 2, "nodesPerCandidate": 1200 },
+    "expert": { "candidates": 2, "nodesPerCandidate": 2400 },
+    "selectionNamespace": "sichuan-distill-select-20261113-v1",
+    "frozenFinalNamespace": "sichuan-distill-final-20261113-v1",
+    "frozenFinalSeedTables": 4320,
+    "frozenFinalCandidateSeats": 4,
+    "controlSeedTables": 640,
+    "finalUsedForSelection": false
+  },
+  "reference": {
+    "url": "https://github.com/twu3202/TanyaoDojo/tree/b44f7a62440db96186fa1c9553e1c6edb8e1bb71/sichuan",
+    "license": "MIT",
+    "used": "Clipped PPO formula, gamma=1 and per-seat returns. Rules, runtime, features, teacher, search and MLP are project implementations."
+  }
+}

@@ -119,7 +119,7 @@ function shallowDistance(input: RegionalBotInput, hand: string[], melds: MeldVie
   return Math.max(hand.length % 3 === 2 ? -1 : 0, estimate);
 }
 
-function ordinaryContext(input: RegionalBotInput, player: ScoringPlayer, tile: string, selfDraw: boolean): ScoreContext {
+export function ordinaryContext(input: RegionalBotInput, player: ScoringPlayer, tile: string, selfDraw: boolean): ScoreContext {
   const waitingHand = [...player.hand];
   if (selfDraw) {
     const winningIndex = waitingHand.lastIndexOf(tile);
@@ -164,7 +164,7 @@ function combinedValue(ron: number, tsumo: number): number {
 }
 
 /** A bounded route estimate is used until a complete legal wait can be scored. */
-function routeValue(input: RegionalBotInput, hand: string[], melds: MeldView[]): number {
+export function routeValue(input: RegionalBotInput, hand: string[], melds: MeldView[]): number {
   const all = [...hand, ...melds.flatMap(meld => meld.tiles)];
   if (!input.profile.id.startsWith('sichuan')) {
     if (input.profile.id === 'sanma') return input.player.riichi ? 3900 : 2000;
@@ -227,7 +227,7 @@ function routeValue(input: RegionalBotInput, hand: string[], melds: MeldView[]):
   return combinedValue(ron, perPayer * payers);
 }
 
-function withPublicLossValues(input: RegionalBotInput): BotObservation {
+export function withPublicLossValues(input: RegionalBotInput): BotObservation {
   if (!input.profile.id.startsWith('sichuan')) return input.observation;
   const options = normalizeSichuanOptions(input.sichuan, 2);
   const players = input.observation.players.map(player => {
@@ -675,6 +675,7 @@ function evaluateRegionalV7(input: RegionalBotInput): BotDecision {
     }
     used += budget.used;
     return { key: state.action.key, tile: state.discard, hand: state.hand, shanten: effectiveDistance, ukeire,
+      metricsComplete: measured !== undefined && !budget.exhausted,
       estimatedValue, shapeScore: shapeValue(state.hand, state.melds), ronUkeire, tsumoUkeire, ronValue, tsumoValue,
       riichiDeclaration: state.action.type === 'riichi', immediateGain: state.immediateGain };
   });

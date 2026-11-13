@@ -68,6 +68,7 @@ export function rankRegionalCandidates(input: RegionalBotInput, candidates: Regi
     if (input.difficulty === 'novice') score = -candidate.shanten * unit * 20 + (candidate.shapeScore || 0) * unit * .02;
     if (input.difficulty === 'standard') score = -candidate.shanten * unit * 1000 + candidate.ukeire * unit + gain * .01 - cost;
     return { key: candidate.key, tile: candidate.tile, shanten: candidate.shanten, ukeire: candidate.ukeire,
+      metricsComplete: candidate.metricsComplete,
       estimatedValue: candidate.estimatedValue, risk: danger.risk, lossIfDealIn: danger.lossIfDealIn, score };
   });
   metrics.sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));

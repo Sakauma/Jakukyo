@@ -2,15 +2,17 @@ import type { RegionalBotAction, RegionalBotInput } from '../regional';
 import { parseMeld, tileIndex, visibleCounts } from '../evaluator';
 import { shanten } from '../../variants/hand';
 
-export const SICHUAN_FEATURE_VERSION = 1;
+export const SICHUAN_FEATURE_VERSION = 3;
 export const SICHUAN_TILE_CHANNELS = 16;
 export const SICHUAN_SCALARS = 32;
-export const SICHUAN_FEATURES = 27 * SICHUAN_TILE_CHANNELS + SICHUAN_SCALARS;
+export const SICHUAN_LEGACY_FEATURES = 27 * SICHUAN_TILE_CHANNELS + SICHUAN_SCALARS;
+export const SICHUAN_RULE_FEATURES = SICHUAN_LEGACY_FEATURES + 8;
+export const SICHUAN_FEATURES = SICHUAN_RULE_FEATURES + 4;
 export const SICHUAN_ACTIONS = 137;
 
 /** Fixed whitelist of the acting player's hand and the table's public information. */
-export function encodeSichuanFeatures(input: RegionalBotInput): Float32Array {
-  const features = new Float32Array(SICHUAN_FEATURES);
+export function encodeSichuanFeatures(input: RegionalBotInput, featureVersion: 1 | 2 | 3 = SICHUAN_FEATURE_VERSION): Float32Array {
+  const features = new Float32Array(featureVersion === 1 ? SICHUAN_LEGACY_FEATURES : featureVersion === 2 ? SICHUAN_RULE_FEATURES : SICHUAN_FEATURES);
   const scalar = 27 * SICHUAN_TILE_CHANNELS;
   const observation = input.observation;
   const add = (tile: string, channel: number, amount: number) => {
@@ -31,7 +33,8 @@ export function encodeSichuanFeatures(input: RegionalBotInput): Float32Array {
     player.melds.flatMap(parseMeld).forEach(tile => add(tile, 7 + relative, .25));
     const last = player.discards.at(-1);
     if (last) add(last.tile, 11 + relative, 1);
-    features[scalar + 4 + relative] = (player.points - ownPoints) / 64;
+    features[scalar + 4 + relative] = featureVersion === 1 ? (player.points - ownPoints) / 64
+      : Math.max(-1, Math.min(1, Math.asinh(player.points / 32 - ownPoints / 32) / Math.asinh(256)));
     features[scalar + 8 + relative] = Number(player.active !== false);
     const suit = ['m', 'p', 's'].indexOf(player.voidSuit ?? '');
     if (suit >= 0) features[scalar + 12 + relative * 3 + suit] = 1;
@@ -45,6 +48,18 @@ export function encodeSichuanFeatures(input: RegionalBotInput): Float32Array {
   features[scalar + 29] = input.player.hand.filter(tile => tile[0] === input.player.voidSuit).length / 14;
   features[scalar + 30] = Number(input.drawn !== null);
   features[scalar + 31] = players.reduce((sum, player) => sum + player.discards.length, 0) / 56;
+  if (featureVersion >= 2) {
+    const options = input.sichuan;
+    features[SICHUAN_LEGACY_FEATURES] = Number(input.profile.id === 'sichuan-river');
+    features[SICHUAN_LEGACY_FEATURES + 1] = Number(input.exchangeThree === true);
+    features[SICHUAN_LEGACY_FEATURES + 2] = options?.fanCap === 'none' ? 0 : (options?.fanCap ?? 4) / 8;
+    features[SICHUAN_LEGACY_FEATURES + 3] = Number(options?.fanCap === 'none');
+    features[SICHUAN_LEGACY_FEATURES + 4] = Number(options?.selfDraw === 'fan');
+    features[SICHUAN_LEGACY_FEATURES + 5] = Number(options?.menqingZhongzhang === true);
+    features[SICHUAN_LEGACY_FEATURES + 6] = Number(observation.finalRound);
+    features[SICHUAN_LEGACY_FEATURES + 7] = Math.tanh(ownPoints / 256);
+  }
+  if (featureVersion === 3) players.forEach((player, relative) => features[SICHUAN_RULE_FEATURES + relative] = Number(player.hasWon === true));
   return features;
 }
 

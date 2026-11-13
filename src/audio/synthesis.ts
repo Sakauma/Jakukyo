@@ -66,7 +66,7 @@ export class SoundLibrary {
     const key = `${name}:${variation % 3}`;
     const cached = this.samples.get(key); if (cached) return cached;
     const rate = this.context.sampleRate;
-    const duration = name === 'win-yakuman' ? 2.8 : name === 'win-big' ? 2 : name === 'win-normal' ? 1.3 : name === 'roundEnd' ? .9 : name === 'deal' ? .7 : .5;
+    const duration = name === 'win-yakuman' ? 2.8 : name === 'win-big' ? 2 : name === 'win-normal' ? 1.3 : name === 'roundEnd' ? .9 : name === 'deal' ? .18 : .5;
     const buffer = this.context.createBuffer(1, Math.ceil(rate * duration), rate), data = buffer.getChannelData(0);
     const seed = 317 + variation * 7919;
     const tap = (at: number, strength = .7, material: 'tile' | 'felt' | 'stick' = 'tile') => impact(data, rate, at, strength, seed + Math.round(at * 10000), material);
@@ -79,7 +79,9 @@ export class SoundLibrary {
     else if (name === 'kan') { tap(0, .86); tap(.045, .75); tap(.098, .66); tap(.157, .7, 'felt'); tap(.168, .36); }
     else if (name === 'riichi') { friction(data, rate, 0, .14, .23, seed); tap(.1, .6, 'stick'); tap(.123, .19, 'stick'); peak = .49; }
     else if (name === 'kita') { tap(0, .54); friction(data, rate, .04, .13, .6, seed); tap(.174, .3, 'felt'); peak = .45; }
-    else if (name === 'deal') { for (let n = 0; n < 8; n++) tap(n * .054, .25 + n % 3 * .07, n % 3 ? 'tile' : 'felt'); friction(data, rate, .12, .35, .25, seed); peak = .42; }
+    else if (name === 'deal') { tap(0, .5, 'felt'); tap(.014, .32); tap(.038, .18); peak = .31; }
+    else if (name === 'reveal') { friction(data, rate, 0, .09, .2, seed); tap(0, .35, 'felt'); tap(.035, .39); tap(.07, .49, 'felt'); peak = .43; }
+    else if (name === 'collect') { friction(data, rate, 0, .39, .7, seed); tap(.07, .2); tap(.15, .24, 'felt'); tap(.24, .16); tap(.35, .26, 'felt'); peak = .38; }
     else if (name === 'roundEnd') { friction(data, rate, .02, .24, .34, seed); mallet(data, rate, .08, 174.6, .2, .15); mallet(data, rate, .19, 261.6, .11, .12); peak = .29; }
     else {
       tap(0, .45, 'felt'); tap(.026, .2);

@@ -1,7 +1,7 @@
 /** All AI input is a structured-clone-safe projection of one player's information. */
 export type Difficulty = 'novice' | 'standard' | 'advanced' | 'expert';
 
-export const AI_VERSION = 8;
+export const AI_VERSION = 11;
 export const DIFFICULTIES: ReadonlyArray<{ id: Difficulty; label: string; description: string }> = [
   { id: 'novice', label: '入门', description: '辨认搭子与孤张，适合熟悉规则。' },
   { id: 'standard', label: '标准', description: '计算向听与有效进张，选择有役的鸣牌。' },
@@ -33,6 +33,8 @@ export interface PublicOpponent {
   riichi: boolean;
   /** False only for publicly retired players, such as a blood-battle winner. */
   active?: boolean;
+  /** Public win history within this hand, including blood-river players who remain active. */
+  hasWon?: boolean;
   /** Publicly declared missing suit in Sichuan rules. */
   voidSuit?: string;
   /** An estimate derived from this opponent's exposed tiles and the table rules. */
@@ -88,6 +90,8 @@ export interface CandidateMetrics {
   tile?: string;
   shanten: number;
   ukeire: number;
+  /** False when the bounded evaluation could not finish the shape or effective-tile count. */
+  metricsComplete?: boolean;
   estimatedValue: number;
   risk: number;
   lossIfDealIn: number;
@@ -113,6 +117,7 @@ export interface GenericCandidate {
   tile?: string;
   shanten: number;
   ukeire: number;
+  metricsComplete?: boolean;
   estimatedValue: number;
   shapeScore?: number;
   /** Optional rule-specific search estimate, evaluated exclusively on the player's information. */

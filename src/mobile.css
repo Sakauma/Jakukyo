@@ -51,7 +51,7 @@
   .lobby-config .resume-button{flex:0 0 auto}
   .lobby-config .resume-button span{display:none}
 
-  .game-shell>.play-dock{flex:0 0 60px;height:60px;min-height:60px;max-height:60px;gap:6px;padding:5px 7px}
+  .game-shell>.play-dock{flex:0 0 68px;height:68px;min-height:68px;max-height:68px;gap:6px;padding:7px 8px}
   .play-dock>.my-seat{flex:0 0 auto;min-width:0;max-width:130px;gap:5px;padding-right:7px}
   .my-avatar{width:26px;height:32px;font-size:19px;flex-shrink:0}
   .my-name{gap:3px;margin-bottom:2px;font-size:12px;white-space:nowrap}
@@ -70,12 +70,12 @@
   .play-dock>.response-actions{flex:1 1 300px;min-width:0;max-width:none;margin-left:auto;gap:5px;overflow:hidden}
   .response-actions>.game-actions{flex:1 1 auto;justify-content:flex-start;flex-wrap:nowrap;min-width:0;max-width:none;max-height:none;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;overscroll-behavior-x:contain}
   .response-actions>.win-actions{gap:5px}
-  .game-actions>.action-button,.win-actions>.action-button{flex:0 0 auto;min-width:54px;min-height:44px;padding:6px 9px;font-size:13px;white-space:nowrap}
-  .game-actions>.discard-button{flex:0 0 auto;width:auto;min-width:112px;max-width:none;min-height:44px;padding:7px 10px;gap:8px}
+  .game-actions>.action-button,.win-actions>.action-button{flex:0 0 auto;min-width:58px;min-height:48px;padding:8px 11px;font-size:14px;white-space:nowrap}
+  .game-actions>.discard-button{flex:0 0 auto;width:auto;min-width:120px;max-width:none;min-height:48px;padding:8px 12px;gap:8px}
   .game-actions>.riichi-action{flex:0 0 auto;width:auto;min-width:58px;max-width:none}
   .action-tiles i{font-size:11px;padding:1px 2px}
-  .auto-control{flex:0 0 44px;gap:0;padding-left:0;border-left:0}
-  .auto-control>.icon-button{width:44px;height:44px}
+  .auto-control{flex:0 0 48px;gap:0;padding-left:0;border-left:0}
+  .auto-control>.icon-button{width:48px;height:48px}
   .auto-control>span,.auto-control>.auto-difficulty-control{display:none}
 
   .round-chip{top:4px;left:5px;gap:5px;padding:4px 7px;font-size:12px}

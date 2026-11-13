@@ -1,0 +1,66 @@
+{
+  "id": "jakukyo-sichuan-rules-v2-bc-search-20261113",
+  "trainingBaseline": "1d22e3c8e44dcd1e3cb20fe877776bcaee7408fd",
+  "checkpoint": "best-bc.pt",
+  "parametersSha256": "bbb4e2e756db434e540cda949a838e98135c0197045bf220358a6b6394075d2f",
+  "featureVersion": 2,
+  "policyVersion": 1,
+  "architecture": [472, 128, 128, 138],
+  "scope": {
+    "modes": ["sichuan-blood", "sichuan-river"],
+    "rulesVersion": 2,
+    "version": 2,
+    "fanCaps": [3, 4, 5, 6, 8, "none"],
+    "selfDraw": ["base", "fan"],
+    "menqingZhongzhang": [false, true],
+    "exchangeThree": [false, true],
+    "configurations": 96,
+    "difficulties": ["advanced", "expert"]
+  },
+  "training": {
+    "teacher": "Jakukyo v7 expert bounded search",
+    "newTrainGames": 1152,
+    "newValidationGames": 224,
+    "legacyTrainGames": 256,
+    "legacyValidationGames": 32,
+    "trainDecisions": 88653,
+    "validationDecisions": 16209,
+    "warmStartParametersSha256": "57effd8baba35582bedbed1b7ca35f786dd0972f99e2f59785a9c309efaed3ae",
+    "bcEpochs": 30,
+    "bestEpoch": 29,
+    "seed": 20261113,
+    "ppoCandidateRounds": 4,
+    "ppoGamesPerRound": 320,
+    "ppoEpochsPerRound": 4,
+    "selection": "BC selected after independent 320-table four-seat paired selection. PPO candidates retained for audit.",
+    "returnUtility": "tanh(asinh(net/32)/4)",
+    "preparation": "Exchange and missing-suit declaration use the existing preparation policy. Training contains the resulting public decisions and complete-hand returns."
+  },
+  "validation": {
+    "crossEntropy": 0.7442947626113892,
+    "nonforcedAccuracy": 0.6512327194213867,
+    "illegalActions": 0,
+    "checkpointRestoreExact": true,
+    "trainingContinuationExact": true
+  },
+  "deployment": {
+    "firstAiVersion": 9,
+    "prior": "masked neural logits allocate candidate searches",
+    "continuation": "Two effective own draws weighted by publicly unseen copies without replacement, with a legal intervening discard.",
+    "scoreWeight": 0.3,
+    "maximumInitialScoreGap": 2,
+    "advanced": { "candidates": 2, "nodesPerCandidate": 1200 },
+    "expert": { "candidates": 4, "nodesPerCandidate": 1800 },
+    "tie": "preserve the algorithm anchor unless a completed continuation is strictly better",
+    "selectionNamespace": "sichuan-rules-select-20261113-v2",
+    "frozenFinalNamespace": "sichuan-rules-final-20261113-frozen-v2",
+    "frozenFinalSeedTables": 640,
+    "frozenFinalCandidateSeats": 4,
+    "finalUsedForSelection": false
+  },
+  "reference": {
+    "url": "https://github.com/twu3202/TanyaoDojo/tree/b44f7a62440db96186fa1c9553e1c6edb8e1bb71/sichuan",
+    "license": "MIT",
+    "used": "Clipped PPO formula, gamma=1, per-seat reward accumulation. Runtime, rules, features, search and MLP are project implementations."
+  }
+}

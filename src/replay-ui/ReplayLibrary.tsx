@@ -14,6 +14,7 @@ import type { GameRecord } from '../records/types';
 import { displayScoringText } from '../presentation/scoringText';
 import { ExperienceDialog } from '../experience-ui/ExperienceDialog';
 import { ReplaySettlementDetails } from '../settlement/RoundSettlement';
+import { ReplayDecisionPanel } from './ReplayDecisionPanel';
 import './replay.css';
 
 const dateText = (value: string) => new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
@@ -31,11 +32,11 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
   const [failed3D, setFailed3D] = useState(false);
   const [showScoring, setShowScoring] = useState(false);
   useEffect(() => {
-    let stopped = false;
+    let stopped = false; const controller = new AbortController();
     setLoading(true); setError(''); setFrames([]); setIndex(0); setPlaying(false); setShowHands(false);
-    buildReplayFrames(record.save).then(result => { if (!stopped) { setFrames(result); setLoading(false); } })
+    buildReplayFrames(record.save, { signal: controller.signal, captureDecisions: true }).then(result => { if (!stopped) { setFrames(result); setLoading(false); } })
       .catch(reason => { if (!stopped) { setLoading(false); setError(reason instanceof Error ? reason.message : '这份牌谱暂时无法重建。'); } });
-    return () => { stopped = true; };
+    return () => { stopped = true; controller.abort(); };
   }, [record.id]);
   useEffect(() => {
     if (!playing || !frames.length) return;
@@ -95,6 +96,7 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
         <aside className="replay-detail">
           <span className="replay-label">当前动作</span><p className="replay-action" aria-live="polite">{displayScoringText(frame.actionLabel || snapshot.message, snapshot.mode, playerNames)}</p>
           <dl><div><dt>玩法</dt><dd>{getMode(record.mode).name}</dd></div><div><dt>对局进度</dt><dd>{index + 1} / {frames.length} 步</dd></div><div><dt>记录状态</dt><dd>{recordStatus(record)}</dd></div></dl>
+          <ReplayDecisionPanel frames={frames} index={index} onGo={go} onPause={() => setPlaying(false)} theme={theme} />
           <label className="replay-reveal" title={frame.allHands ? undefined : '本局结束后可查看'}><input type="checkbox" checked={showHands && !!frame.allHands} disabled={!frame.allHands} onChange={event => setShowHands(event.target.checked)} />查看各家手牌</label>
           {hasScoring && <button className="replay-scoring-open" type="button" onClick={() => { setPlaying(false); setShowScoring(true); }}>查看计分明细</button>}
           

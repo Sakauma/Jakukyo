@@ -1,4 +1,4 @@
-import { SICHUAN_ACTIONS, SICHUAN_FEATURES } from './sichuanFeatures';
+import { SICHUAN_ACTIONS, SICHUAN_FEATURES, SICHUAN_LEGACY_FEATURES, SICHUAN_RULE_FEATURES } from './sichuanFeatures';
 
 interface DenseLayerData { input: number; output: number; relu: boolean; weight: string; bias: string }
 export interface SichuanPolicyData {
@@ -12,7 +12,7 @@ export interface SichuanPrediction { logits: Float32Array; value: number }
 
 /** The same float32 dense inference is used by headless self-play and the offline game. */
 export function createSichuanPolicy(model: SichuanPolicyData): (features: Float32Array) => SichuanPrediction {
-  if (model.format !== 'jakukyo-sichuan-mlp-f32-v1' || model.featureVersion !== 1 || model.policyVersion !== 1
+  if (model.format !== 'jakukyo-sichuan-mlp-f32-v1' || ![1, 2, 3].includes(model.featureVersion) || model.policyVersion !== 1
     || model.layers.length !== 3) throw new Error('四川模型格式不兼容。');
   const decode = (encoded: string) => {
     const binary = atob(encoded);
@@ -21,7 +21,8 @@ export function createSichuanPolicy(model: SichuanPolicyData): (features: Float3
     if (floats.some(value => !Number.isFinite(value))) throw new Error('四川模型权重损坏。');
     return floats;
   };
-  const dimensions = [SICHUAN_FEATURES, 128, 128, SICHUAN_ACTIONS + 1];
+  const featureCount = model.featureVersion === 1 ? SICHUAN_LEGACY_FEATURES : model.featureVersion === 2 ? SICHUAN_RULE_FEATURES : SICHUAN_FEATURES;
+  const dimensions = [featureCount, 128, 128, SICHUAN_ACTIONS + 1];
   const layers = model.layers.map((layer, index) => {
     const weight = decode(layer.weight), bias = decode(layer.bias);
     if (layer.input !== dimensions[index] || layer.output !== dimensions[index + 1]
@@ -30,7 +31,7 @@ export function createSichuanPolicy(model: SichuanPolicyData): (features: Float3
     return { ...layer, weight, bias };
   });
   return features => {
-    if (features.length !== SICHUAN_FEATURES || features.some(value => !Number.isFinite(value))) throw new Error('四川模型观测无效。');
+    if (features.length !== featureCount || features.some(value => !Number.isFinite(value))) throw new Error('四川模型观测无效。');
     let hidden = features;
     for (const layer of layers) {
       const output = new Float32Array(layer.output);

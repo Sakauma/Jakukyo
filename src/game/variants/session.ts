@@ -1,21 +1,21 @@
 import type { Difficulty, BotObservation, GenericCandidate } from '../ai/types';
 import { AI_VERSION, resolveAutoPlayDifficulty, validDifficulty } from '../ai/types';
 import { rankPublicCandidates, samplePublicDraws } from '../ai/evaluator';
-import { chooseSichuanHybridAction, supportsSichuanModelTable, SICHUAN_MODEL_IDENTITY } from '../ai/models/sichuanHybrid';
+import { chooseSichuanHybridAction, supportsSichuanModelTable, sichuanModelIdentity } from '../ai/models/sichuanHybrid';
 import { encodeMcrFeatures, MCR_MODEL_IDENTITY } from '../ai/models/mcrFeatures';
 import type { BotDecision } from '../ai/types';
 import type { BotReplayDecision } from '../types';
 import type { RegionalBotInput } from '../ai/regional';
 import { RegionalDecisionService } from '../ai/regionalService';
 import { getMode } from '../catalog';
-import type { ConfirmedWinEvent, EndlessCheckpoint, GameLogEntry, GameSessionAPI, GameSnapshot, LegalAction, MeldView, ModeId, QuickControls, ReplayData, ReplayFrame, RegionalHandHint, RegionalWaitView, RonNotice, RoundResult, SavedGame, SelfWinNotice, SessionOptions, SichuanOptions, WinnerView } from '../types';
+import type { ConfirmedWinEvent, EndlessCheckpoint, GameLogEntry, GameSessionAPI, GameSnapshot, LegalAction, MeldView, ModeId, QuickControls, ReplayCaptureOptions, ReplayData, ReplayFrame, RegionalHandHint, RegionalWaitView, RonNotice, RoundResult, SavedGame, SelfWinNotice, SessionOptions, SichuanOptions, WinnerView } from '../types';
 import { decompose, shanten } from './hand';
 import { evaluateMcrHand, getProfile, isBurstReady, isMcrWinningShape, nextWildcard, profileTiles, scoreHand } from './rules';
 import type { HandScore, RuleProfile, ScoreContext, ScoringPlayer } from './rules';
 import { coreMeld, coreString, countsOf, norm, seededRandom, shuffle, sortTiles, tileCode, tileIndex, tileLabel, WINDS } from './tiles';
 import { createRiichiAssistCalculator, projectRiichiAssist } from '../assist/riichiAssist';
 import { chooseQuickAction, DEFAULT_QUICK_CONTROLS, updateQuickControls } from '../quickControls';
-import { appendReplayFrame, finishReplayFrames, MAX_REPLAY_STEPS, validateReplayData, yieldReplayWork } from '../replaySupport';
+import { appendReplayDecision, appendReplayFrame, finishReplayFrames, MAX_REPLAY_STEPS, validateReplayData, yieldReplayWork } from '../replaySupport';
 import { furitenView } from '../assist/furiten';
 import { furitenReasons } from '../ronNotice';
 import { restoredStartPoints, validStartPoints } from '../startingPoints';
@@ -86,6 +86,8 @@ export class RegionalSession implements GameSessionAPI {
   private listeners=new Set<()=>void>();
   private timer:ReturnType<typeof setTimeout>|null=null;
   private disposed=false;
+  private presentationPaused=false;
+  private presentationReplies:Array<()=>void>=[];
   private replaying=false;
   private aiVersion=AI_VERSION;
   private rulesVersion: 1 | 2 = 2;
@@ -115,6 +117,7 @@ export class RegionalSession implements GameSessionAPI {
     this.decisionCache.clear();
     this.decisionProviders.clear();
     this.pendingDecisions.clear();
+    this.presentationReplies=[];
   }
   private seat(id:number){return (id-this.dealer+this.profile.players)%this.profile.players;}
   private playerAtSeat(seat:number){return (this.dealer+seat)%this.profile.players;}
@@ -581,6 +584,7 @@ export class RegionalSession implements GameSessionAPI {
         id: opponent.id, seat: this.seat(opponent.id), points: opponent.points,
         dealer: opponent.id === this.dealer, riichi: opponent.riichi,
         ...(currentStrategy ? { active: isActive(opponent), voidSuit: opponent.voidSuit } : {}),
+        ...(this.effectiveAiVersion(player) >= 10 ? { hasWon: opponent.hasWon } : {}),
         melds: opponent.melds.map(meld => this.hideOpponentConcealedKongs()
           && opponent.id !== player.id && meld.concealed ? '____' : coreMeld(meld)),
         discards: opponent.discards.map(discard => ({ ...discard })),
@@ -643,9 +647,14 @@ export class RegionalSession implements GameSessionAPI {
     void this.decisionService.choose(input).then(decision => {
       if(generation!==this.decisionGeneration)return;
       this.pendingDecisions.delete(key);
-      if (!decision || this.disposed || step !== this.step || stage !== this.stage || turn !== this.turn) return;
-      const choice = choices.find(action => action.key === decision.key);
-      if (choice) receive(choice, key, decision);
+      if (!decision) return;
+      const deliver = () => {
+        if (generation !== this.decisionGeneration || this.disposed || step !== this.step || stage !== this.stage || turn !== this.turn) return;
+        const choice = choices.find(action => action.key === decision.key);
+        if (choice) receive(choice, key, decision);
+      };
+      if (this.presentationPaused) this.presentationReplies.push(deliver);
+      else deliver();
     });
   }
   private prepareTurnDecision(player: Player, choices: Choice[]): boolean {
@@ -787,7 +796,7 @@ export class RegionalSession implements GameSessionAPI {
     return choices.find(c=>c.type==='pass')||choices[0];
   }
   private tick(){
-    if(this.disposed||this.stage==='settlement'||this.stage==='match')return;
+    if(this.disposed||this.stage==='settlement'||this.stage==='match'||this.presentationPaused&&!this.replaying)return;
     if(this.stage==='exchange'&&(!this.options.autoPlay||!this.options.autoExchangeThree))return;
     this.step++;
     if(this.stage==='exchange'){
@@ -819,7 +828,7 @@ export class RegionalSession implements GameSessionAPI {
     return (this.stage==='void'||this.stage==='discard'&&this.turn===0||this.stage==='response'&&this.actions.length>0&&!this.response?.replies.has(0))&&!this.options.autoPlay&&!this.quickChoice();
   }
   private schedule(){
-    if(this.replaying||this.disposed||this.timer!==null||this.stage==='settlement'||this.stage==='match')return;
+    if(this.replaying||this.disposed||this.presentationPaused||this.timer!==null||this.stage==='settlement'||this.stage==='match')return;
     if(this.stage==='response'&&this.response)this.prepareResponseBots(this.response);
     if(this.waitingForHuman())return;
     if(this.stage==='response'&&this.response&&this.missingResponseBots(this.response))return;
@@ -850,6 +859,13 @@ export class RegionalSession implements GameSessionAPI {
     this.publish();this.schedule();return true;
   }
   setAutoPlay(enabled:boolean){this.options.autoPlay=enabled;this.cancel();this.publish();this.schedule();}
+  setPresentationPaused(paused:boolean){
+    if(this.presentationPaused===paused||this.disposed)return;
+    this.presentationPaused=paused;
+    if(this.timer!==null)clearTimeout(this.timer);this.timer=null;
+    if(!paused){const replies=this.presentationReplies;this.presentationReplies=[];for(const reply of replies)reply();}
+    this.publish();this.schedule();
+  }
   setAutoPlayDifficulty(difficulty:Difficulty){
     if(!validDifficulty(difficulty)||!this.options.autoPlayMatchDifficulty&&this.options.autoPlayDifficulty===difficulty)return;
     this.options.autoPlayDifficulty=difficulty;this.options.autoPlayMatchDifficulty=false;this.cancel();this.publish();this.schedule();
@@ -866,7 +882,7 @@ export class RegionalSession implements GameSessionAPI {
     const responseSubmitted=this.stage==='response'&&this.response?.replies.has(0);
     const humanActions=this.stage==='discard'&&this.turn!==0||responseSubmitted?[]:this.actions;
     const human=this.players[0],distance=this.distance(human.hand,human.melds);
-    this.snapshot={status:this.stage==='match'?'matchEnd':this.stage==='settlement'?'roundEnd':'playing',phase:this.stage==='exchange'?'exchange':this.stage==='void'?'void':this.stage==='settlement'||this.stage==='match'?'settlement':this.stage==='discard'&&this.turn===0?'discard':this.stage==='response'&&humanActions.length?'response':'waiting',seed:this.options.seed,players:this.players.map(player=>({id:player.id,name:NAMES[player.id],wind:WINDS[this.seat(player.id)],points:player.points,dealer:player.id===this.dealer,riichi:player.riichi,isHuman:player.id===0,hand:player.id===0?player.hand.map((tile,index)=>({id:this.handId(player.id,index),tile,label:tileLabel(tile),drawn:!!player.drawn&&index===player.hand.length-1})):[],concealedCount:player.hand.length,discards:player.discards.map(d=>({...d})),melds:player.melds.map(m=>({...m,tiles:[...m.tiles]})),flowers:[...player.flowers],kita:player.kita,voidSuit:player.voidSuit,hasWon:player.hasWon,winCount:player.winCount,...(this.stage==='settlement'&&this.roundWinners.some(w=>w.playerId===player.id)?{revealedHand:[...this.roundWinners.filter(win=>win.playerId===player.id).at(-1)!.hand]}:{})})),round:{wind:WINDS[Math.floor(this.roundNumber/this.profile.players)%4],hand:this.roundNumber%this.profile.players+1,honba:this.honba,riichiSticks:this.sticks,tilesLeft:this.wall.length,doraIndicators:[...this.dora],uraIndicators:this.stage==='settlement'&&this.roundWinners.some(w=>this.players[w.playerId].riichi)?[...this.ura]:[],dealer:this.dealer,wildcard:this.wildcard},turn:this.turn,humanId:0,actions:humanActions.map(({key:_key,index:_index,consume:_consume,kind:_kind,meldIndex:_meldIndex,...action})=>action),message:this.stage==='exchange'?'选择三张同花色的牌交换':this.stage==='void'?'请选择本局定缺花色':this.stage==='settlement'?this.result?.title||'本局结束':this.stage==='match'?'对局结束':this.stage==='discard'&&this.turn===0?'轮到你了 · 选择一张牌打出':this.stage==='response'&&humanActions.length?'请选择和牌、鸣牌或跳过':`${NAMES[this.turn]}正在思考…`,log:[...this.logs],result:this.result?structuredClone(this.result):null,...(this.latestWin?{latestWin:structuredClone(this.latestWin)}:{}),autoPlay:this.options.autoPlay,speed:this.options.speed,revision:++this.revision,shanten:distance,waits:distance===0?this.shapeWaits(human):[],mode:this.profile.id,modeName:getMode(this.profile.id).name,difficulty:this.options.difficulty,playerCount:this.profile.players,handSize:this.profile.sets*3+1,scoreUnit:this.profile.id==='sanma'?'点':'分',setupSelection:[...this.exchangeSelection].map(i=>this.handId(0,i)),ruleSummary:[...this.profile.summary]};
+    this.snapshot={status:this.stage==='match'?'matchEnd':this.stage==='settlement'?'roundEnd':'playing',phase:this.stage==='exchange'?'exchange':this.stage==='void'?'void':this.stage==='settlement'||this.stage==='match'?'settlement':this.stage==='discard'&&this.turn===0?'discard':this.stage==='response'&&humanActions.length?'response':'waiting',seed:this.options.seed,players:this.players.map(player=>({id:player.id,name:NAMES[player.id],wind:WINDS[this.seat(player.id)],points:player.points,dealer:player.id===this.dealer,riichi:player.riichi,isHuman:player.id===0,hand:player.id===0?player.hand.map((tile,index)=>({id:this.handId(player.id,index),tile,label:tileLabel(tile),drawn:!!player.drawn&&index===player.hand.length-1})):[],concealedCount:player.hand.length,discards:player.discards.map(d=>({...d})),melds:player.melds.map(m=>({...m,tiles:[...m.tiles]})),flowers:[...player.flowers],kita:player.kita,voidSuit:player.voidSuit,hasWon:player.hasWon,winCount:player.winCount,...(this.stage==='settlement'&&this.roundWinners.some(w=>w.playerId===player.id)?{revealedHand:this.profile.continuing==='river'?[...player.hand]:[...this.roundWinners.filter(win=>win.playerId===player.id).at(-1)!.hand]}:{})})),round:{wind:WINDS[Math.floor(this.roundNumber/this.profile.players)%4],hand:this.roundNumber%this.profile.players+1,honba:this.honba,riichiSticks:this.sticks,tilesLeft:this.wall.length,doraIndicators:[...this.dora],uraIndicators:this.stage==='settlement'&&this.roundWinners.some(w=>this.players[w.playerId].riichi)?[...this.ura]:[],dealer:this.dealer,wildcard:this.wildcard},turn:this.turn,humanId:0,actions:humanActions.map(({key:_key,index:_index,consume:_consume,kind:_kind,meldIndex:_meldIndex,...action})=>action),message:this.stage==='exchange'?'选择三张同花色的牌交换':this.stage==='void'?'请选择本局定缺花色':this.stage==='settlement'?this.result?.title||'本局结束':this.stage==='match'?'对局结束':this.stage==='discard'&&this.turn===0?'轮到你了 · 选择一张牌打出':this.stage==='response'&&humanActions.length?'请选择和牌、鸣牌或跳过':`${NAMES[this.turn]}正在思考…`,log:[...this.logs],result:this.result?structuredClone(this.result):null,...(this.latestWin?{latestWin:structuredClone(this.latestWin)}:{}),autoPlay:this.options.autoPlay,speed:this.options.speed,revision:++this.revision,shanten:distance,waits:distance===0?this.shapeWaits(human):[],mode:this.profile.id,modeName:getMode(this.profile.id).name,difficulty:this.options.difficulty,playerCount:this.profile.players,handSize:this.profile.sets*3+1,scoreUnit:this.profile.id==='sanma'?'点':'分',setupSelection:[...this.exchangeSelection].map(i=>this.handId(0,i)),ruleSummary:[...this.profile.summary]};
     if(this.options.matchLength==='endless')this.snapshot.round.sequence=this.handSequence;
     if(this.aiVersion>=7&&this.profile.id==='mcr')this.snapshot.hideOpponentConcealedKongs=this.hideOpponentConcealedKongs();
     if(this.sichuanOptions){this.snapshot.sichuanOptions={...this.sichuanOptions};this.snapshot.ruleSummary=[...this.profile.summary,...sichuanRuleSummary(this.sichuanOptions)];}
@@ -891,7 +907,7 @@ export class RegionalSession implements GameSessionAPI {
   }
   getSavedGame():SavedGame{return {version:1,seed:this.options.seed,matchLength:this.options.matchLength,mode:this.profile.id,difficulty:this.options.difficulty,startPoints:this.options.startPoints,autoPlayDifficulty:this.options.autoPlayDifficulty,autoPlayMatchDifficulty:this.options.autoPlayMatchDifficulty,autoExchangeThree:this.options.autoExchangeThree,aiVersion:this.aiVersion,rulesVersion:this.rulesVersion,replayPosition:this.step,variantOptions:this.options.variantOptions?structuredClone(this.options.variantOptions):undefined,decisions:this.decisions.map(d=>({...d})),
     ...(this.aiVersion>=7?{botDecisions:this.botDecisions.map(decision=>({...decision})).sort((a,b)=>a.step-b.step||a.playerId-b.playerId||a.sequence-b.sequence),...(this.profile.id==='mcr'?{aiModel:{...MCR_MODEL_IDENTITY}}:{})}:{}),
-    ...(this.usesSichuanModel()?{aiModel:{...SICHUAN_MODEL_IDENTITY}}:{}),
+    ...(this.usesSichuanModel()?{aiModel:{...sichuanModelIdentity(this.aiVersion)}}:{}),
     ...(this.checkpoint?{checkpoint:structuredClone(this.checkpoint)}:{})};}
   exportReplay():ReplayData{return {...this.getSavedGame(),rules:{mode:this.profile.id,version:this.sichuanOptions?`${getMode(this.profile.id).name} v${this.sichuanOptions.version}`:getMode(this.profile.id).ruleVersion,summary:this.sichuanOptions?[...this.profile.summary,...sichuanRuleSummary(this.sichuanOptions)]:this.profile.summary},log:this.logs.map(l=>({...l}))};}
   loadSavedGame(data:SavedGame):boolean{
@@ -919,12 +935,14 @@ export class RegionalSession implements GameSessionAPI {
     this.replaying=false;this.replayBotChoices.clear();this.publish();this.schedule();return success;
   }
   /** Used only on a disposable session; never emits reconstructed live events. */
-  async captureReplayFrames(data:SavedGame):Promise<ReplayFrame[]>{
+  async captureReplayFrames(data:SavedGame,options:ReplayCaptureOptions={}):Promise<ReplayFrame[]>{
+    options.signal?.throwIfAborted();
     validateReplayData(data);this.cancel();this.replaying=true;this.replayFrames=[];this.aiVersion=data.aiVersion??2;
     this.replayBotChoices=new Map((data.botDecisions||[]).map(decision=>[`${decision.step}:${decision.playerId}:${decision.sequence}`,decision]));
     this.initialize({seed:data.seed,mode:data.mode,difficulty:data.difficulty||'standard',startPoints:restoredStartPoints(data),autoPlayDifficulty:data.autoPlayDifficulty??'expert',autoPlayMatchDifficulty:data.autoPlayMatchDifficulty??false,autoExchangeThree:data.autoExchangeThree??false,rulesVersion:data.rulesVersion??1,variantOptions:data.variantOptions,matchLength:data.matchLength,autoPlay:false,speed:0,quickControls:DEFAULT_QUICK_CONTROLS},data.checkpoint);
     let cursor=0;
     for(let guard=0;guard<MAX_REPLAY_STEPS;guard++){
+      options.signal?.throwIfAborted();
       const exactEnd=data.replayPosition!=null;
       if(exactEnd&&this.step>data.replayPosition!)throw new Error('牌谱结束位置与操作记录不一致。');
       if(cursor===data.decisions.length&&(!exactEnd||this.step===data.replayPosition))break;
@@ -938,7 +956,21 @@ export class RegionalSession implements GameSessionAPI {
           this.exchangeSelection=new Set(selected);this.record(key);this.step++;this.exchange();this.publish();
         }else{
           const choice=this.actions.find(action=>action.key===key);
-          if(!choice||!this.dispatch(choice.id))throw new Error('牌谱包含当前规则不允许的操作。');
+          if(!choice)throw new Error('牌谱包含当前规则不允许的操作。');
+          if(options.captureDecisions){
+            const input=this.regionalBotInput(this.players[0],this.actions);
+            input.observation.players=input.observation.players.map(opponent=>{
+              const player=this.players[opponent.id];
+              return {...opponent,active:!player.hasWon||this.profile.continuing!=='blood',voidSuit:player.voidSuit,
+                melds:player.melds.map(meld=>this.profile.id==='mcr'&&player.id!==0&&meld.concealed?'____':coreMeld(meld))};
+            });
+            input.observation.activePlayerCount=input.observation.players.filter(player=>player.active!==false).length;
+            if(this.profile.id==='mcr')input.modelFeatures=encodeMcrFeatures(input.observation);
+            appendReplayDecision(this.replayFrames!,{actualKey:choice.key,
+              actions:this.actions.map(({key,type,label,tile,tiles})=>({key,type,label,tile,tiles})),
+              input:{kind:'regional',input},sourceAiVersion:this.aiVersion});
+          }
+          if(!this.dispatch(choice.id))throw new Error('牌谱包含当前规则不允许的操作。');
         }
       }else if(this.stage==='match')break;else this.tick();
       if(guard%48===47)await yieldReplayWork();

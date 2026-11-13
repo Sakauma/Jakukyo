@@ -22,18 +22,23 @@ import { bonusMotionKey, createTableMotionController, meldMotionKey, opponentMot
 import type { TileMotion } from './motion/tableMotion';
 import { tilePlacement } from './tilePlacement';
 import type { TilePlacement } from './tilePlacement';
+import { AdaptiveTableQuality, deviceTableQuality } from './AdaptiveTableQuality';
+import { TABLE_QUALITY } from './adaptiveQuality';
+import { publicRoundHands, revealedOwnHand, roundDealDelay, roundRevealProgress, ROUND_DEAL_TRAVEL } from '../presentation/roundPresentation';
+import type { RoundPresentation } from '../presentation/roundPresentation';
 
 interface TileProps {
   theme: TableTheme; tile?: string; position: [number, number, number]; rotation?: [number, number, number];
   scale?: number; stackHeight?: number; selected?: boolean; interactive?: boolean; faded?: boolean; animatePosition?: boolean; onClick?: () => void;
   placement?: TilePlacement;
+  round?: { phase: RoundPresentation | null; hand?: boolean; seat?: number; index?: number; originZ?: number; revealFrom?: [number, number, number] };
   motion?: TileMotion; reducedMotion?: boolean; matched?: boolean; candidate?: boolean;
   handInput?: { context: HandDragContext | null; onPreview: (preview: HandDragPreview | null) => void;
     onDrop: (preview: HandDragPreview, pose: [number, number, number], rotation: [number, number, number], scale: number) => boolean };
 }
 
 const noRaycast = () => {};
-function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHeight = 0, selected = false, interactive = false, faded = false, animatePosition = false, onClick, motion, reducedMotion = false, matched = false, candidate = false, handInput, placement }: TileProps) {
+function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHeight = 0, selected = false, interactive = false, faded = false, animatePosition = false, onClick, motion, reducedMotion = false, matched = false, candidate = false, handInput, placement, round }: TileProps) {
   const [hover, setHover] = useState(false);
   const [dragging, setDragging] = useState(false), [dropValid, setDropValid] = useState(false);
   const [gesture] = useState(() => createHandDragController(HAND_ROW_Z - .60));
@@ -52,6 +57,8 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
   const initialPosition = useRef<[number, number, number]>([motion?.from[0] ?? position[0], 0, motion?.from[2] ?? position[2]]);
   const targetRotation = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(...rotation)), [rotation[0], rotation[1], rotation[2]]);
   const fromRotation = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(...(motion?.rotation ?? rotation))), [motion?.id]);
+  const revealRotation = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(...(round?.revealFrom ?? rotation))), [round?.revealFrom?.[0], round?.revealFrom?.[1], round?.revealFrom?.[2]]);
+  const dealingRotation = useMemo(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)), []);
   const hit = handInput ? handHitBox(rotation, scale) : null;
   const dragKey = handInput?.context ? JSON.stringify(handInput.context) : '';
   const pointerPoint = (event: ThreeEvent<PointerEvent>): HandDragPoint | null => {
@@ -134,7 +141,39 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
     const carried = drag.current?.dragging ? [drag.current.position[0], restY + .8, drag.current.position[1]] : released.current;
     const elapsed = motion ? performance.now() - motion.started : Infinity;
     const moving = !!motion && !motion.cancelled && !reducedMotion && !document.hidden && elapsed < motion.duration;
-    if (carried) {
+    const phase = !reducedMotion && !document.hidden ? round?.phase : null;
+    const phaseTime = phase ? performance.now() - phase.started : Infinity;
+    const collecting = phase?.kind === 'collect';
+    const dealing = phase?.kind === 'deal' && round?.hand;
+    const revealing = phase?.kind === 'reveal' && !!round?.revealFrom;
+    positionRef.current.visible = true;
+    if (collecting) {
+      const p = Math.max(0, Math.min(1, phaseTime / phase.duration));
+      const eased = p * p * (3 - 2 * p), originZ = round?.originZ ?? 0;
+      positionRef.current.position.set(position[0] * (1 - eased * .82), 0,
+        THREE.MathUtils.lerp(position[2], (position[2] + originZ) * .18 - originZ, eased));
+      ref.current.position.y = restY - eased * eased * 1.15;
+      ref.current.scale.setScalar(scale * (1 - eased * .08));
+      ref.current.quaternion.copy(targetRotation);
+      positionRef.current.visible = p < .98;
+    } else if (dealing) {
+      const delay = roundDealDelay(round?.index ?? 0, round?.seat ?? 0);
+      const p = Math.max(0, Math.min(1, (phaseTime - delay) / ROUND_DEAL_TRAVEL));
+      const eased = p * p * (3 - 2 * p);
+      positionRef.current.visible = phaseTime >= delay;
+      positionRef.current.position.set(THREE.MathUtils.lerp(position[0] * .7, position[0], eased), 0,
+        THREE.MathUtils.lerp(position[2] - 1.15, position[2], eased));
+      ref.current.position.y = THREE.MathUtils.lerp(.31 * scale, restY, eased) + Math.sin(Math.PI * p) * .15;
+      ref.current.quaternion.slerpQuaternions(dealingRotation, targetRotation, eased);
+      ref.current.scale.setScalar(scale);
+    } else if (revealing) {
+      const progress = roundRevealProgress(phase, phaseTime);
+      const eased = progress * progress * (3 - 2 * progress);
+      positionRef.current.position.set(position[0], 0, position[2]);
+      ref.current.position.y = THREE.MathUtils.lerp(tileRestHeight(round!.revealFrom!, scale), restY, eased) + Math.sin(Math.PI * progress) * .04;
+      ref.current.quaternion.slerpQuaternions(revealRotation, targetRotation, eased);
+      ref.current.scale.setScalar(scale);
+    } else if (carried) {
       positionRef.current.position.set(carried[0], 0, carried[2] - HAND_ROW_Z);
       ref.current.position.y = reducedMotion ? carried[1] : THREE.MathUtils.damp(ref.current.position.y, carried[1], 28, delta);
       ref.current.quaternion.copy(targetRotation); ref.current.scale.setScalar(scale);
@@ -209,11 +248,17 @@ function Tile({ theme, tile, position, rotation = [0, 0, 0], scale = 1, stackHei
   </group>;
 }
 
-function RiichiStick({ motion, reduced }: { motion?: TileMotion; reduced: boolean }) {
+function RiichiStick({ motion, reduced, phase }: { motion?: TileMotion; reduced: boolean; phase?: RoundPresentation | null }) {
   const ref = useRef<THREE.Group>(null);
   const { position, size, dotRadius } = riichiStickLayout;
   useFrame(() => {
     if (!ref.current) return;
+    ref.current.visible = true;
+    if (phase?.kind === 'collect' && !reduced && !document.hidden) {
+      const p = Math.max(0, Math.min(1, (performance.now() - phase.started) / phase.duration)), eased = p * p * (3 - 2 * p);
+      ref.current.position.set(position[0] * (1 - eased * .82), position[1] - eased * eased * 1.15, position[2] * (1 - eased * .82));
+      ref.current.visible = p < .98; return;
+    }
     const p = motion && !motion.cancelled && !reduced && !document.hidden ? Math.min(1, Math.max(0, (performance.now() - motion.started) / motion.duration)) : 1;
     const eased = p * p * (3 - 2 * p);
     ref.current.position.set(THREE.MathUtils.lerp(motion?.from[0] ?? position[0], position[0], eased), THREE.MathUtils.lerp(motion?.from[1] ?? position[1], position[1], eased) + Math.sin(p * Math.PI) * (motion?.arc ?? 0), THREE.MathUtils.lerp(motion?.from[2] ?? position[2], position[2], eased));
@@ -262,15 +307,17 @@ function Center({ snapshot, theme, playerCount }: { snapshot: GameSnapshot | nul
   </group>;
 }
 
-function Walls({ remaining, theme, reserve, indicators, placementSeed }: { remaining: number; theme: TableTheme; reserve: number; indicators: string[]; placementSeed: number }) {
+function Walls({ remaining, theme, reserve, indicators, placementSeed, phase }: { remaining: number; theme: TableTheme; reserve: number; indicators: string[]; placementSeed: number; phase: RoundPresentation | null }) {
   const tiles = useMemo(() => Array.from({ length: visibleWallCount(remaining, reserve) }, (_, index) => wallTileTransform(index, indicators)), [remaining, reserve, indicators]);
-  return <group>{tiles.map((tile, i) => <Tile theme={theme} key={i} {...tile} placement={tilePlacement(placementSeed, `wall:${Math.floor(i / 2)}`, 'wall')} />)}</group>;
+  return <group>{tiles.map((tile, i) => <Tile theme={theme} key={i} {...tile} placement={tilePlacement(placementSeed, `wall:${Math.floor(i / 2)}`, 'wall')} round={{ phase }} />)}</group>;
 }
 
 const previewHand = ['m2', 'm3', 'm4', 'm6', 'm7', 'm8', 'p2', 'p2', 'p3', 'p4', 'p5', 's3', 's4', 's5'];
 interface SceneProps {
   snapshot: GameSnapshot | null; selectedId: string | null; selectedIds?: string[]; interactiveIds?: string[];
   sessionIdentity?: object | null;
+  roundPresentation?: RoundPresentation | null;
+  revealedHands?: Record<number, string[]>;
   displayHand?: HandTile[];
   onSelect: (tile: HandTile) => void; view: 'perspective' | 'overhead'; theme: TableTheme; previewPlayerCount?: number;
   celebration?: WinEffect | null;
@@ -295,20 +342,30 @@ function StudioEnvironment() {
   return null;
 }
 
-function Scene({ snapshot, selectedId, selectedIds = [], interactiveIds, displayHand, onSelect, view, theme, previewPlayerCount = 4, celebration, reducedMotion = false, highlightedTile = null, discardAction = null, discardIntent = null, onTileDiscard, sessionIdentity }: SceneProps) {
-  const { camera, gl } = useThree();
+function Scene({ snapshot, selectedId, selectedIds = [], interactiveIds, displayHand, onSelect, view, theme, previewPlayerCount = 4, celebration, reducedMotion = false, highlightedTile = null, discardAction = null, discardIntent = null, onTileDiscard, sessionIdentity, roundPresentation = null, revealedHands }: SceneProps) {
+  const { camera, gl, size } = useThree();
   const felt = useMemo(() => feltSurface(theme), [theme]);
   const wood = useMemo(() => woodSurface(theme), [theme]);
   useEffect(() => { gl.toneMappingExposure = theme.exposure; }, [gl, theme.exposure]);
   const desired = useMemo(() => new THREE.Vector3(), []);
+  const compact = size.width <= 1100 && size.height <= 420 && size.width > size.height * 1.6;
   useFrame((_, delta) => {
-    desired.set(0, view === 'overhead' ? 19.8 : 9, view === 'overhead' ? 6.9 : 11.8);
-    camera.position.lerp(desired, reducedMotion ? 1 : 1 - Math.exp(-delta * 3)); camera.lookAt(0, 0, view === 'overhead' ? .65 : 1.2);
+    desired.set(0, view === 'overhead' ? 19.8 : compact ? 8 : 9, view === 'overhead' ? 6.9 : compact ? 12 : 11.8);
+    camera.position.lerp(desired, reducedMotion ? 1 : 1 - Math.exp(-delta * 3));
+    camera.lookAt(0, 0, view === 'overhead' ? .65 : compact ? 1.4 : 1.2);
+    const perspective = camera as THREE.PerspectiveCamera;
+    const fov = compact && view !== 'overhead' ? 41 : 43;
+    if (Math.abs(perspective.fov - fov) > .01) { perspective.fov = fov; perspective.updateProjectionMatrix(); }
+    gl.domElement.dataset.tableLayout = compact ? 'landscape' : 'desktop';
+    gl.domElement.dataset.roundPhase = roundPresentation?.kind ?? 'idle';
   });
   const playerCount = snapshot?.players.length ?? previewPlayerCount;
   const human = snapshot?.players.find(player => player.isHuman);
   const sampleHand = playerCount === 3 ? ['m1', 'm9', 'p2', 'p3', 'p4', 'p6', 'p7', 'p8', 's3', 's4', 's5', 'z4', 'z5', 'z5'] : previewHand;
-  const ownHand = displayHand ?? human?.hand ?? sampleHand.map((tile, i) => ({ id: String(i), tile, label: '', drawn: i === 13 }));
+  const publicHands = revealedHands ?? (snapshot ? publicRoundHands(snapshot) : {});
+  const ended = !!snapshot && snapshot.status !== 'playing';
+  const ownHand = revealedOwnHand(displayHand ?? human?.hand ?? sampleHand.map((tile, i) => ({ id: String(i), tile, label: '', drawn: i === 13 })), publicHands[0]);
+  const ownFaceUp = ended || !!publicHands[0];
   const [motionController] = useState(createTableMotionController);
   const dragPreview = useRef<HandDragPreview | null>(null);
   useEffect(() => {
@@ -329,7 +386,7 @@ function Scene({ snapshot, selectedId, selectedIds = [], interactiveIds, display
     <StudioEnvironment />
     <color attach="background" args={[theme.background]} /><fog attach="fog" args={[theme.background, 28, 54]} />
     <ambientLight intensity={theme.id === 'contrast' ? .22 : .07} /><hemisphereLight args={[theme.light, '#17251f', .25]} />
-    <directionalLight position={[-6.5, 11, 5]} intensity={1.9} color={theme.light} castShadow shadow-mapSize={[2048, 2048]} shadow-camera-left={-9.5} shadow-camera-right={9.5} shadow-camera-top={9.5} shadow-camera-bottom={-9.5} shadow-camera-near={1} shadow-camera-far={32} shadow-bias={-.0001} shadow-normalBias={.009} shadow-radius={3} />
+    <AdaptiveTableQuality theme={theme} />
     <directionalLight position={[5, 6, -5]} intensity={.34} color={theme.fillLight} />
     <mesh position={[0, -.92, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow><planeGeometry args={[100, 100]} /><meshStandardMaterial color={theme.background} roughness={.95} /></mesh>
     <mesh position={[0, -.39, 0]} geometry={tableBody} dispose={null} receiveShadow castShadow><meshPhysicalMaterial map={wood.map} bumpMap={wood.bump} bumpScale={.009} roughness={.36} clearcoat={.24} clearcoatRoughness={.36} /></mesh>
@@ -337,10 +394,10 @@ function Scene({ snapshot, selectedId, selectedIds = [], interactiveIds, display
     <mesh position={[0, .025, 0]} geometry={tableFelt} dispose={null} receiveShadow><meshStandardMaterial map={felt.map} bumpMap={felt.bump} bumpScale={.013} roughness={.97} envMapIntensity={.22} /></mesh>
     {[-6.82, 6.82].map(x => <mesh key={x} position={[x, .025, 0]} rotation={[0, Math.PI / 2, 0]} geometry={shortRail} dispose={null} castShadow receiveShadow><meshPhysicalMaterial map={wood.map} bumpMap={wood.bump} bumpScale={.008} roughness={.33} clearcoat={.32} clearcoatRoughness={.34} /></mesh>)}
     {[-6.59, 6.59].map(z => <mesh key={z} position={[0, .025, z]} geometry={longRail} dispose={null} castShadow receiveShadow><meshPhysicalMaterial map={wood.map} bumpMap={wood.bump} bumpScale={.008} roughness={.33} clearcoat={.32} clearcoatRoughness={.34} /></mesh>)}
-    <Center snapshot={snapshot} theme={theme} playerCount={playerCount} /><Walls remaining={snapshot?.round.tilesLeft ?? 70} theme={theme} reserve={reserve} indicators={snapshot?.round.doraIndicators ?? ['p4']} placementSeed={motionFrame.placementSeed} />
+    <Center snapshot={snapshot} theme={theme} playerCount={playerCount} /><Walls remaining={snapshot?.round.tilesLeft ?? 70} theme={theme} reserve={reserve} indicators={snapshot?.round.doraIndicators ?? ['p4']} placementSeed={motionFrame.placementSeed} phase={roundPresentation} />
     {celebration && <TableCelebration key={celebration.id} effect={celebration} theme={theme} />}
     <group key={`hand-${motionFrame.identity}`} position={[0, 0, HAND_ROW_Z]}>
-      {motionFrame.hand.map(({ key, tile, position, scale }) => <Tile key={key} theme={theme} tile={tile.tile} position={position} rotation={[-.31, 0, 0]} scale={scale} animatePosition motion={motionFrame.motions.get(key)} reducedMotion={reducedMotion} selected={selectedId === tile.id || selectedIds.includes(tile.id)} interactive={!!snapshot && legalIds.has(tile.id)} faded={restricted && !legalIds.has(tile.id)} candidate={restricted && legalIds.has(tile.id)} onClick={() => onSelect(tile)} placement={tilePlacement(motionFrame.placementSeed, key, 'hand')}
+      {motionFrame.hand.map(({ key, tile, position, scale }, index) => <Tile key={key} theme={theme} tile={tile.tile} position={position} rotation={ownFaceUp ? [-Math.PI / 2, 0, 0] : [-.31, 0, 0]} scale={scale} animatePosition motion={motionFrame.motions.get(key)} reducedMotion={reducedMotion} selected={selectedId === tile.id || selectedIds.includes(tile.id)} interactive={!!snapshot && legalIds.has(tile.id)} faded={restricted && !legalIds.has(tile.id)} candidate={restricted && legalIds.has(tile.id)} onClick={() => onSelect(tile)} placement={tilePlacement(motionFrame.placementSeed, key, 'hand')} round={{ phase: roundPresentation, hand: true, seat: 0, index, originZ: HAND_ROW_Z, revealFrom: roundPresentation?.hands[0] ? [-.31, 0, 0] : undefined }}
         handInput={{ context: snapshot && discardAction && onTileDiscard && legalIds.has(tile.id) ? { tileId: tile.id, selectionScope, action: discardAction, legalKey } : null,
           onPreview: preview => { dragPreview.current = preview; },
           onDrop: (preview, pose, rotation) => {
@@ -351,16 +408,17 @@ function Scene({ snapshot, selectedId, selectedIds = [], interactiveIds, display
     </group>
     {dropTarget && <DropTarget preview={dragPreview} position={dropTarget.position} rotation={dropTarget.rotation} />}
     {seats.filter(player => player.id !== 0).map(player => {
-      const layout = seatLayout(Array.from({ length: player.revealedHand?.length ?? player.concealedCount }, () => ({ drawn: false })), player.melds, false, (snapshot?.handSize ?? 13) > 14);
+      const publicHand = publicHands[player.id];
+      const layout = seatLayout(Array.from({ length: publicHand?.length ?? player.concealedCount }, () => ({ drawn: false })), player.melds, false, (snapshot?.handSize ?? 13) > 14);
       return <group key={`${motionFrame.identity}-opponent-${player.id}`} rotation={[0, tableSeat(player.id, playerCount) * Math.PI / 2, 0]}>
-        {layout.hand.map((slot, i) => <Tile theme={theme} key={i} tile={player.revealedHand?.[i]} position={[slot.position[0], 0, HAND_ROW_Z]} rotation={player.revealedHand ? [-Math.PI / 2, 0, 0] : [-.09, 0, Math.PI]} scale={slot.scale} animatePosition motion={motionFrame.motions.get(opponentMotionKey(player.id, i))} reducedMotion={reducedMotion} placement={tilePlacement(motionFrame.placementSeed, opponentMotionKey(player.id, i), 'hand')} />)}
+        {layout.hand.map((slot, i) => <Tile theme={theme} key={i} tile={publicHand?.[i]} position={[slot.position[0], 0, HAND_ROW_Z]} rotation={publicHand ? [-Math.PI / 2, 0, 0] : [-.09, 0, Math.PI]} scale={slot.scale} animatePosition motion={motionFrame.motions.get(opponentMotionKey(player.id, i))} reducedMotion={reducedMotion} placement={tilePlacement(motionFrame.placementSeed, opponentMotionKey(player.id, i), 'hand')} round={{ phase: roundPresentation, hand: true, seat: tableSeat(player.id, playerCount), index: i, revealFrom: roundPresentation?.hands[player.id] ? [-.09, 0, Math.PI] : undefined }} />)}
       </group>;
     })}
     {(snapshot?.players ?? []).map(player => <group key={`${motionFrame.identity}-public-${player.id}`} rotation={[0, tableSeat(player.id, playerCount) * Math.PI / 2, 0]}>
-      {riverLayout(player.discards).items.map(discard => <Tile key={discard.sourceIndex} theme={theme} tile={discard.tile} position={discard.position} rotation={discard.rotation} scale={discard.scale} faded={discard.tsumogiri} matched={riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.pageIndices.includes(discard.sourceIndex)} animatePosition motion={motionFrame.motions.get(riverMotionKey(player.id, discard.sourceIndex))} reducedMotion={reducedMotion} placement={tilePlacement(motionFrame.placementSeed, riverMotionKey(player.id, discard.sourceIndex), 'river')} />)}
-      {seatLayout(player.id === 0 ? ownHand : Array.from({ length: player.revealedHand?.length ?? player.concealedCount }, () => ({ drawn: false })), player.melds, player.id === 0, (snapshot?.handSize ?? 13) > 14, !!snapshot?.hideOpponentConcealedKongs && player.id !== snapshot.humanId).melds.map(tile => <Tile key={tile.key} theme={theme} tile={tile.tile} position={tile.position} rotation={tile.rotation} scale={tile.scale} matched={!!tile.tile && !!riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.meldIndices.some(index => index.meldIndex === tile.meldIndex && index.tileIndex === tile.tileIndex)} animatePosition motion={motionFrame.motions.get(meldMotionKey(player.id, tile.meldIndex, tile.tileIndex))} reducedMotion={reducedMotion} />)}
-      {Array.from({ length: player.kita ?? 0 }, (_, i) => <Tile key={`bonus-${i}`} theme={theme} tile="z4" position={bonusPosition(i)} rotation={[-Math.PI / 2, 0, 0]} scale={.58} motion={motionFrame.motions.get(bonusMotionKey(player.id, (player.flowers?.length ?? 0) + i))} reducedMotion={reducedMotion} />)}
-      {player.riichi && <RiichiStick motion={motionFrame.motions.get(stickMotionKey(player.id))} reduced={reducedMotion} />}
+      {riverLayout(player.discards).items.map(discard => <Tile key={discard.sourceIndex} theme={theme} tile={discard.tile} position={discard.position} rotation={discard.rotation} scale={discard.scale} faded={discard.tsumogiri} matched={riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.pageIndices.includes(discard.sourceIndex)} animatePosition motion={motionFrame.motions.get(riverMotionKey(player.id, discard.sourceIndex))} reducedMotion={reducedMotion} placement={tilePlacement(motionFrame.placementSeed, riverMotionKey(player.id, discard.sourceIndex), 'river')} round={{ phase: roundPresentation }} />)}
+      {seatLayout(player.id === 0 ? ownHand : Array.from({ length: player.revealedHand?.length ?? player.concealedCount }, () => ({ drawn: false })), player.melds, player.id === 0, (snapshot?.handSize ?? 13) > 14, !!snapshot?.hideOpponentConcealedKongs && player.id !== snapshot.humanId).melds.map(tile => <Tile key={tile.key} theme={theme} tile={tile.tile} position={tile.position} rotation={tile.rotation} scale={tile.scale} matched={!!tile.tile && !!riverMatches.byPlayer.find(matches => matches.playerId === player.id)?.meldIndices.some(index => index.meldIndex === tile.meldIndex && index.tileIndex === tile.tileIndex)} animatePosition motion={motionFrame.motions.get(meldMotionKey(player.id, tile.meldIndex, tile.tileIndex))} reducedMotion={reducedMotion} round={{ phase: roundPresentation }} />)}
+      {Array.from({ length: player.kita ?? 0 }, (_, i) => <Tile key={`bonus-${i}`} theme={theme} tile="z4" position={bonusPosition(i)} rotation={[-Math.PI / 2, 0, 0]} scale={.58} motion={motionFrame.motions.get(bonusMotionKey(player.id, (player.flowers?.length ?? 0) + i))} reducedMotion={reducedMotion} round={{ phase: roundPresentation }} />)}
+      {player.riichi && <RiichiStick motion={motionFrame.motions.get(stickMotionKey(player.id))} reduced={reducedMotion} phase={roundPresentation} />}
     </group>)}
   </>;
 }
@@ -380,7 +438,8 @@ function ContextMonitor({ onFailure, onRestore }: { onFailure: () => void; onRes
 
 export default function MahjongTable(props: Omit<SceneProps, 'theme'> & { theme?: TableTheme; onFailure: () => void; onRestore?: () => void }) {
   const theme = props.theme ?? getTheme();
-  return <Canvas style={{ touchAction: 'none' }} shadows="soft" camera={{ position: [0, 9, 11.8], fov: 43, near: .1, far: 100 }} dpr={[1, 1.5]} gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }} onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = theme.exposure; }} fallback={<div className="webgl-fallback">当前浏览器无法创建 WebGL 3D 场景，请使用启用硬件加速的 Edge 或 Chrome。</div>}>
+  const [initialQuality] = useState(deviceTableQuality);
+  return <Canvas style={{ touchAction: 'none' }} shadows="soft" camera={{ position: [0, 9, 11.8], fov: 43, near: .1, far: 100 }} dpr={[1, TABLE_QUALITY[initialQuality].pixelRatio]} gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }} onCreated={({ gl }) => { gl.toneMapping = THREE.ACESFilmicToneMapping; gl.toneMappingExposure = theme.exposure; }} fallback={<div className="webgl-fallback">当前浏览器无法创建 WebGL 3D 场景，请使用启用硬件加速的 Edge 或 Chrome。</div>}>
     <ContextMonitor onFailure={props.onFailure} onRestore={props.onRestore} /><Suspense fallback={null}><Scene {...props} theme={theme} /></Suspense>
   </Canvas>;
 }

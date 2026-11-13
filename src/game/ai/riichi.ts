@@ -75,7 +75,7 @@ function handValue(hand: Hand, observation: BotObservation, riichi: boolean, sha
   return Math.min(16000, 1000 * Math.pow(2, Math.max(0, han - 1))) * (observation.seat === 0 ? 1.5 : 1);
 }
 
-function basicMetrics(hand: Hand, key: string, discard: string, observation: BotObservation, known: number[], riichi = false, calibrated = false): RiichiCandidate {
+export function basicMetrics(hand: Hand, key: string, discard: string, observation: BotObservation, known: number[], riichi = false, calibrated = false): RiichiCandidate {
   const shanten = Majiang.Util.xiangting(hand);
   const effective: string[] = Majiang.Util.tingpai(hand) || [];
   const ukeire = effective.reduce((sum, tile) => sum + Math.max(0, (observation.tileLimits?.[tileIndex(tile)] ?? 4) - known[tileIndex(tile)]), 0);

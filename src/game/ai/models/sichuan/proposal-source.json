@@ -1,0 +1,66 @@
+{
+  "id": "jakukyo-sichuan-rules-v3-bc-value-20261113",
+  "trainingBaseline": "1d22e3c8e44dcd1e3cb20fe877776bcaee7408fd",
+  "checkpoint": "proposal-warm.pt",
+  "parametersSha256": "d6249b676f70b64595fc722999779d683fe39a0a5f222e6d410301436b231e46",
+  "featureVersion": 3,
+  "policyVersion": 1,
+  "proposalVersion": 1,
+  "architecture": [476, 128, 128, 138],
+  "scope": {
+    "modes": ["sichuan-blood", "sichuan-river"],
+    "rulesVersion": 2,
+    "version": 2,
+    "fanCaps": [3, 4, 5, 6, 8, "none"],
+    "selfDraw": ["base", "fan"],
+    "menqingZhongzhang": [false, true],
+    "exchangeThree": [false, true],
+    "configurations": 96,
+    "difficulties": ["advanced", "expert"]
+  },
+  "training": {
+    "selectedPhase": "expanded BC warm start",
+    "parentParametersSha256": "bbb4e2e756db434e540cda949a838e98135c0197045bf220358a6b6394075d2f",
+    "newPublicFeatures": "Four relative-seat hasWon flags. Added first-layer columns start at zero.",
+    "bcTrainGames": 1408,
+    "bcValidationGames": 256,
+    "bcEpochs": 30,
+    "bcBestEpoch": 29,
+    "selectedValueHeadUtility": "tanh(asinh(net/32)/4)",
+    "proposalExperiment": {
+      "games": 640,
+      "decisions": 41035,
+      "policySamples": 11903,
+      "epochs": 4,
+      "steps": 96,
+      "rewardVersion": 3,
+      "proposalVersion": 1,
+      "reward": "net/32",
+      "valueLoss": "Huber beta=1",
+      "gradientNorm": 0.5,
+      "parametersSha256": "6ab27789c346b793d58a6a4ce6d50078fbde51beb3ce59c69c3a0596cc18c620",
+      "selection": "Retained for audit. Expanded BC had the higher paired selection net."
+    },
+    "preparation": "Existing exchange-three and missing-suit policies execute before the public decisions used for training."
+  },
+  "deployment": {
+    "firstAiVersion": 10,
+    "proposal": "Single masked categorical proposal including the fixed anchor as no-op. Remaining execution is independent of all other logits.",
+    "ordinaryWinValue": "Uses scoreHand and regionalAwardValue with the table rules, active payers and ordinary win context.",
+    "legalReady": "Legal ordinary waits remain qualified for draw settlement when all copies are publicly exhausted.",
+    "terminalEstimate": "Ordinary maximum ron payout with public hasWon exemptions. Opponent non-readiness probability is conservatively estimated at 0.5.",
+    "rootNodes": 1200,
+    "advanced": { "candidates": 2, "nodesPerCandidate": 1200 },
+    "expert": { "candidates": 2, "nodesPerCandidate": 2400 },
+    "selectionNamespace": "sichuan-rules-select-20261113-v2",
+    "frozenFinalNamespace": "sichuan-proposal-final-20261113-frozen-v1",
+    "frozenFinalSeedTables": 640,
+    "frozenFinalCandidateSeats": 4,
+    "finalUsedForSelection": false
+  },
+  "reference": {
+    "url": "https://github.com/twu3202/TanyaoDojo/tree/b44f7a62440db96186fa1c9553e1c6edb8e1bb71/sichuan",
+    "license": "MIT",
+    "used": "Clipped PPO formula, gamma=1 and per-seat rewards. Rules, runtime, features, search and MLP are project implementations."
+  }
+}

@@ -1,5 +1,7 @@
 import type { GameSnapshot } from '../game/types';
 import { motionDuration, needsTableBaseline, soundStartDelay, tableMotionCues } from '../presentation/tableTimeline';
+import { roundPresentationSounds, roundRevealContact, ROUND_PRESENTATION_DURATION } from '../presentation/roundPresentation';
+import type { RoundPresentation } from '../presentation/roundPresentation';
 import { getWinEffect } from '../effects/winEffects';
 import { SoundLibrary } from './synthesis';
 import { BackgroundMusic } from './music';
@@ -36,6 +38,10 @@ export function createTableAudio(initial: Partial<AudioPreferences> = {}): Table
   let motionReduced = false;
   const heard = new Set<string>();
   const voices = new Set<AudioBufferSourceNode>();
+  const presentationVoices = new Set<AudioBufferSourceNode>();
+  let presentation: { phase: RoundPresentation; snapshot: GameSnapshot; emitted: boolean } | null = null;
+  let pendingWin: { tier: WinSoundTier; seat: number } | null = null;
+  let winTimer: ReturnType<typeof setTimeout> | null = null;
   const hidden = () => typeof document !== 'undefined' && document.hidden;
   const usable = () => !disposed && unlocked && !hidden() && preferences.sound && !!context && context.state === 'running';
 
@@ -46,7 +52,15 @@ export function createTableAudio(initial: Partial<AudioPreferences> = {}): Table
   }
   function stopVoices() {
     for (const voice of voices) { try { voice.stop(); } catch { /* Already ended. */ } }
-    voices.clear();
+    voices.clear(); presentationVoices.clear();
+    if (winTimer) clearTimeout(winTimer);
+    winTimer = null; pendingWin = null;
+  }
+  function cancelPresentationVoices() {
+    for (const voice of presentationVoices) { try { voice.stop(); } catch { /* Already ended. */ } voices.delete(voice); }
+    presentationVoices.clear();
+    if (winTimer) clearTimeout(winTimer);
+    winTimer = null; pendingWin = null;
   }
   function stopAmbience() {
     if (ambientSource) { try { ambientSource.stop(); } catch { /* Already ended. */ } ambientSource.disconnect(); }
@@ -98,7 +112,7 @@ export function createTableAudio(initial: Partial<AudioPreferences> = {}): Table
       }
       if (context.state === 'suspended') await context.resume();
       if (disposed || hidden()) return false;
-      unlocked = context.state === 'running'; updateGains(); return unlocked;
+      unlocked = context.state === 'running'; updateGains(); schedulePresentation(); return unlocked;
     } catch { return false; }
   }
 
@@ -110,29 +124,57 @@ export function createTableAudio(initial: Partial<AudioPreferences> = {}): Table
     pan.pan.value = [0, .34, 0, -.34][physicalSeat] ?? 0; gain.gain.value = volume * (physicalSeat === 2 ? .82 : physicalSeat === 0 ? 1 : .91);
     source.buffer = library.get(name, variation++ % 3); source.playbackRate.value = 1 + ((variation % 5) - 2) * .006;
     source.connect(gain); gain.connect(pan); pan.connect(effects); voices.add(source);
-    source.onended = () => { voices.delete(source); source.disconnect(); gain.disconnect(); pan.disconnect(); };
+    source.onended = () => { voices.delete(source); presentationVoices.delete(source); source.disconnect(); gain.disconnect(); pan.disconnect(); };
     source.start(context.currentTime + .006 + delay);
+    return source;
   }
   function play(sound: TableSound, seat = 0) { emit(sound, seat); }
   function playWin(tier: WinSoundTier, seat = 0, delay = 0) {
     if (usable() && preferences.effects > 0 && preferences.master > 0) music?.duck(tier === 'yakuman' ? 2.5 : tier === 'big' ? 1.7 : 1.1, delay);
-    emit(`win-${tier}`, seat, delay);
+    return emit(`win-${tier}`, seat, delay);
   }
 
-  function sync(snapshot: GameSnapshot | null, options: { reducedMotion?: boolean } = {}) {
+  function schedulePresentation() {
+    if (!presentation || !usable()) return;
+    const { phase, snapshot } = presentation, elapsed = performance.now() - phase.started;
+    if (elapsed >= phase.duration) return;
+    if (!presentation.emitted) {
+      presentation.emitted = true;
+      for (const event of roundPresentationSounds(snapshot, phase)) {
+        if (event.at < elapsed - 24 && !(phase.kind === 'collect' && elapsed < 150)) continue;
+        const source = emit(event.sound, event.seat, Math.max(0, event.at - elapsed) / 1000, event.volume);
+        if (source) presentationVoices.add(source);
+      }
+    }
+    if (phase.kind === 'reveal' && pendingWin) {
+      if (winTimer) clearTimeout(winTimer);
+      winTimer = null;
+      const source = playWin(pendingWin.tier, pendingWin.seat, Math.max(0, roundRevealContact(phase) - elapsed) / 1000);
+      if (source) presentationVoices.add(source);
+      pendingWin = null;
+    }
+  }
+  function syncPresentation(snapshot: GameSnapshot, next: RoundPresentation | null) {
+    if (presentation?.phase.id === next?.id) { schedulePresentation(); return; }
+    if (presentation && performance.now() < presentation.phase.started + presentation.phase.duration - 20) cancelPresentationVoices();
+    presentation = next ? { phase: next, snapshot, emitted: false } : null;
+    schedulePresentation();
+  }
+
+  function sync(snapshot: GameSnapshot | null, options: { reducedMotion?: boolean; presentation?: RoundPresentation | null } = {}) {
     if (disposed) return;
     const reduced = options.reducedMotion ?? false;
     if (reduced !== motionReduced) { motionReduced = reduced; stopVoices(); }
-    if (!snapshot) { previous = null; heard.clear(); stopVoices(); return; }
+    if (!snapshot) { previous = null; presentation = null; heard.clear(); stopVoices(); return; }
     playerCount = snapshot.playerCount ?? snapshot.players.length;
     const oldSnapshot = previous, current = frame(snapshot), before = oldSnapshot ? frame(oldSnapshot) : null; previous = snapshot;
     if (!before || needsTableBaseline(oldSnapshot, snapshot) || resumeNeedsBaseline) {
-      const deal = before && current.game === before.game && current.status === 'playing'
-        && (before.status === 'roundEnd' || current.tilesLeft > before.tilesLeft + 10) && !resumeNeedsBaseline;
       heard.clear(); stopVoices(); resumeNeedsBaseline = false;
-      if (deal) play('deal');
+      presentation = null;
+      syncPresentation(snapshot, options.presentation ?? null);
       return;
     }
+    syncPresentation(snapshot, options.presentation ?? null);
     if (current.revision === before.revision || !usable()) return;
     const detected = tableMotionCues(oldSnapshot!, snapshot).filter(cue => !heard.has(cue.key));
     // Some rules expose a flower and its replacement draw in one publication.
@@ -149,7 +191,17 @@ export function createTableAudio(initial: Partial<AudioPreferences> = {}): Table
     if (hasNewWin) {
       const effect = getWinEffect(snapshot), tier = effect?.tier === 3 ? 'yakuman' : effect ? 'big' : 'normal';
       const landing = cues.reduce((delay, cue) => Math.max(delay, motionDuration(cue.kind, snapshot.speed, reduced) / 1000), 0);
-      playWin(tier, winner >= 0 ? winner : snapshot.result?.winners[0]?.playerId ?? 0, landing ? landing + .04 : 0);
+      const seat = winner >= 0 ? winner : snapshot.result?.winners[0]?.playerId ?? 0;
+      if (reduced) playWin(tier, seat, landing ? landing + .04 : 0);
+      else {
+        pendingWin = { tier, seat };
+        if (winTimer) clearTimeout(winTimer);
+        winTimer = setTimeout(() => {
+          const queued = pendingWin; pendingWin = null; winTimer = null;
+          if (queued) playWin(queued.tier, queued.seat);
+        }, ROUND_PRESENTATION_DURATION.reveal);
+        schedulePresentation();
+      }
     } else if ((current.result === 'draw' || current.result === 'abort') && before.result !== current.result) play('roundEnd');
   }
 

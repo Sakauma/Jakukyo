@@ -16,6 +16,10 @@ def parse_args():
     parser.add_argument("--epochs", type=int, help="Additional training epochs, default 60 for BC and 4 for PPO")
     parser.add_argument("--batch", type=int, default=256)
     parser.add_argument("--resume", help="Restore model, optimizer and CPU/CUDA/random generator states for either phase")
+    parser.add_argument("--warm-start", help="Initialize BC weights from a compatible earlier feature version with a fresh optimizer")
+    parser.add_argument("--feature-version", type=int, choices=[1, 2], default=1)
+    parser.add_argument("--seed", type=int, default=20261112)
+    parser.add_argument("--learning-rate", type=float, default=0.001)
     parser.add_argument("--data", help="PPO self-play JSONL file")
     parser.add_argument("--output", help="PPO checkpoint destination")
     parsed = parser.parse_args()
@@ -35,7 +39,9 @@ from torch import nn
 from torch.nn import functional as F
 
 ROOT = Path(__file__).resolve().parent.parent
-SEED = 20261112
+SEED = CLI_ARGS.seed if CLI_ARGS else 20261112
+FEATURE_VERSION = CLI_ARGS.feature_version if CLI_ARGS else 1
+FEATURES = 472 if FEATURE_VERSION == 2 else 464
 torch.set_num_threads(4)
 random.seed(SEED)
 np.random.seed(SEED)
@@ -58,7 +64,7 @@ DEVICE_REPORT["device"] = DEVICE
 class ActorCritic(nn.Module):
     def __init__(self):
         super().__init__()
-        self.layers = nn.Sequential(nn.Linear(464, 128), nn.ReLU(), nn.Linear(128, 128), nn.ReLU(), nn.Linear(128, 138))
+        self.layers = nn.Sequential(nn.Linear(FEATURES, 128), nn.ReLU(), nn.Linear(128, 128), nn.ReLU(), nn.Linear(128, 138))
 
     def forward(self, features):
         output = self.layers(features)
@@ -83,7 +89,7 @@ def read_data(path, policy_only=False):
     if not samples:
         raise ValueError("Dataset contains no selected decisions")
     arrays = {
-        "x": np.empty((samples, 464), dtype=np.float32),
+        "x": np.empty((samples, FEATURES), dtype=np.float32),
         "mask": np.zeros((samples, 137), dtype=np.bool_),
         "a": np.empty(samples, dtype=np.int64),
         **{key: np.empty(samples, dtype=np.float32 if floating[key] else np.int64) for key in floating},
@@ -152,7 +158,7 @@ def export_model(model, destination, checkpoint):
         digest.update(bias)
         layers.append({"input": layer.in_features, "output": layer.out_features, "relu": layer.out_features != 138,
                        "weight": base64.b64encode(weight).decode(), "bias": base64.b64encode(bias).decode()})
-    exported = {"format": "jakukyo-sichuan-mlp-f32-v1", "featureVersion": 1, "policyVersion": 1,
+    exported = {"format": "jakukyo-sichuan-mlp-f32-v1", "featureVersion": FEATURE_VERSION, "policyVersion": 1,
                 "parametersSha256": digest.hexdigest(), "checkpoint": checkpoint, "layers": layers}
     Path(destination).write_text(json.dumps(exported, separators=(",", ":")), encoding="utf8")
     return exported["parametersSha256"]
@@ -160,7 +166,7 @@ def export_model(model, destination, checkpoint):
 
 def save_checkpoint(path, model, optimizer, step, history, phase):
     torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "step": step,
-                "history": history, "phase": phase, "seed": SEED, "architecture": [464, 128, 128, 138],
+                "history": history, "phase": phase, "seed": SEED, "featureVersion": FEATURE_VERSION, "architecture": [FEATURES, 128, 128, 138],
                 "torch_rng": torch.get_rng_state(),
                 "cuda_rng": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
                 "numpy_rng": np.random.get_state(),
@@ -214,8 +220,18 @@ def run_bc(args):
     if set(train_seeds) & set(val_seeds):
         raise ValueError("Seed leakage across dataset partitions")
     model = ActorCritic().to(DEVICE)
+    if args.warm_start:
+        prior = torch.load(args.warm_start, map_location=DEVICE, weights_only=False)
+        state = prior["model"]
+        old_features = state["layers.0.weight"].shape[1]
+        if old_features > FEATURES:
+            raise ValueError("Warm-start feature dimension exceeds the new model")
+        first = torch.zeros_like(model.layers[0].weight)
+        first[:, :old_features] = state["layers.0.weight"]
+        state["layers.0.weight"] = first
+        model.load_state_dict(state)
     initial_parameters = torch.cat([parameter.detach().flatten() for parameter in model.parameters()]).clone()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.0001)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=0.0001)
     history = [{"epoch": 0, "validation": evaluate(model, validation)}]
     steps = 0
     start_epoch = 0
@@ -270,7 +286,8 @@ def run_bc(args):
     report = {"phase": "bc", "device": DEVICE_REPORT, "epochs": args.epochs, "batch": args.batch,
               "resumedFrom": args.resume, "resumedStartEpoch": start_epoch,
               "baseline_validation": baseline_validation,
-              "steps": steps, "learning_rate": 0.001, "weight_decay": 0.0001, "value_coefficient": 0.25,
+              "steps": steps, "learning_rate": args.learning_rate, "weight_decay": 0.0001, "value_coefficient": 0.25,
+              "feature_version": FEATURE_VERSION, "features": FEATURES, "warm_start": args.warm_start,
               "suit_augmentation": True, "seed": SEED, "train_seeds": train_seeds, "validation_seeds": val_seeds,
               "history": history, "best_validation": before, "restore_exact": before == after,
               "training_continuation": continuation,
@@ -327,14 +344,16 @@ def run_ppo(args):
     save_checkpoint(destination, model, optimizer, steps, history, "ppo-mc")
     digest = export_model(model, destination.with_suffix(".json"), destination.name)
     report = {"phase": "ppo-mc", "seeds": seeds, "samples": len(data["a"]), "epochs": args.epochs,
-              "gamma": 1.0, "reward_divisor": 32, "return": "finalPoints[seat] - pointsBeforeDecision[seat]",
+              "feature_version": FEATURE_VERSION, "features": FEATURES, "reward_version": 2 if FEATURE_VERSION == 2 else 1,
+              "gamma": 1.0, "reward_divisor": 32, "return": "utility(finalPoints-initialPoints) - utility(pointsBeforeDecision-initialPoints)" if FEATURE_VERSION == 2 else "finalPoints[seat] - pointsBeforeDecision[seat]",
+              "utility": "tanh(asinh(net/32)/4)" if FEATURE_VERSION == 2 else "net/32",
               "pre_decision_ledger": "separately reconciled to full terminal net", "episode_end": "whole hand settlement",
               "learning_rate": 0.00003, "clip": 0.2, "value_coefficient": 0.5, "entropy_coefficient": 0.005,
               "bc_anchor_coefficient": 0.1, "advantage_standardization": True,
               "rollout_logprob_max_error": parity, "history": history, "validation": evaluate(model, validation),
               "parameters_sha256": digest, "checkpoint": str(destination)}
     destination.with_suffix(".report.json").write_text(json.dumps(report, indent=2), encoding="utf8")
-    print(json.dumps({"complete": report}), flush=True)
+    print(json.dumps({"complete": report | {"seeds": len(seeds), "history": str(destination.with_suffix(".report.json"))}}), flush=True)
 
 
 if __name__ == "__main__":

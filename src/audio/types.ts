@@ -1,6 +1,7 @@
 import type { GameSnapshot } from '../game/types';
+import type { RoundPresentation } from '../presentation/roundPresentation';
 
-export type TableSound = 'select' | 'draw' | 'discard' | 'chi' | 'pon' | 'kan' | 'riichi' | 'kita' | 'deal' | 'roundEnd';
+export type TableSound = 'select' | 'draw' | 'discard' | 'chi' | 'pon' | 'kan' | 'riichi' | 'kita' | 'deal' | 'reveal' | 'collect' | 'roundEnd';
 export type WinSoundTier = 'normal' | 'big' | 'yakuman';
 export interface AudioPreferences {
   sound: boolean;
@@ -21,7 +22,7 @@ export interface TableAudio {
   unlock(): Promise<boolean>;
   setPreferences(preferences: Partial<AudioPreferences>): void;
   /** First/restored snapshots establish a silent baseline; null resets it. */
-  sync(snapshot: GameSnapshot | null, options?: { reducedMotion?: boolean }): void;
+  sync(snapshot: GameSnapshot | null, options?: { reducedMotion?: boolean; presentation?: RoundPresentation | null }): void;
   /** Seat is the fixed visible player id: 0 near, 1 right, 2 far, 3 left. */
   play(sound: TableSound, seat?: number): void;
   select(): void;

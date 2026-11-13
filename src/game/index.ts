@@ -11,12 +11,12 @@ import { furitenView, MissedWinTracker } from './assist/furiten';
 import { furitenReasons, noYakuReason } from './ronNotice';
 import { createRiichiAssistCalculator, projectRiichiAssist } from './assist/riichiAssist';
 import { chooseQuickAction, DEFAULT_QUICK_CONTROLS, updateQuickControls } from './quickControls';
-import { appendReplayFrame, finishReplayFrames, MAX_REPLAY_STEPS, validateReplayData, yieldReplayWork } from './replaySupport';
+import { appendReplayDecision, appendReplayFrame, finishReplayFrames, MAX_REPLAY_STEPS, validateReplayData, yieldReplayWork } from './replaySupport';
 import { newEndlessSessionId } from './endlessCheckpoint';
 import type {
   ActionType, EndlessCheckpoint, GameLogEntry, GameSnapshot, HandTile, LegalAction, MeldView,
   ReplayData, RiichiSessionAPI, RoundResult, SavedGame, SessionOptions, WinnerView, ConfirmedWinEvent,
-  QuickControls, ReplayFrame, RonNotice, BotReplayDecision,
+  QuickControls, ReplayCaptureOptions, ReplayFrame, RonNotice, BotReplayDecision,
 } from './types';
 export type * from './types';
 
@@ -190,6 +190,8 @@ export class RiichiSession implements RiichiSessionAPI {
   private step = 0;
   private revision = 0;
   private paused = false;
+  private presentationPaused = false;
+  private presentationReplies: Array<() => void> = [];
   private finished = false;
   private disposed = false;
   private replaying = false;
@@ -213,6 +215,7 @@ export class RiichiSession implements RiichiSessionAPI {
   newGame(options: SessionOptions = {}): void { this.initialize(options); }
   private initialize(options: SessionOptions, checkpoint?: EndlessCheckpoint): void {
     this.cancelTimer();
+    this.presentationReplies = [];
     this.botService.cancel();
     this.tanyaoService.dispose();
     this.autoPlayService.cancel(); this.autoPlayRequestVersion++;
@@ -340,7 +343,15 @@ export class RiichiSession implements RiichiSessionAPI {
   }
   private decideBot(player: SessionPlayer, choices: Choice[], done: (choice: Choice) => void): void {
     const human = player.seatId === 0;
+    const requestGeneration = this.generation, requestAutoPlayVersion = this.autoPlayRequestVersion;
     const commit = (key: string, source: BotDecision['provider'] = 'algorithm') => {
+      if (this.presentationPaused && !this.replaying) {
+        this.presentationReplies.push(() => {
+          if (!this.disposed && requestGeneration === this.generation
+            && (!human || this.options.autoPlay && requestAutoPlayVersion === this.autoPlayRequestVersion)) commit(key, source);
+        });
+        return;
+      }
       const choice = choices.find(choice => choice.key === key) || choices[0];
       if (this.aiVersion >= 7 && !human) {
         const prefix = `${this.step}:${player.seatId}`, sequence = this.botSequences.get(prefix) || 0;
@@ -444,7 +455,7 @@ export class RiichiSession implements RiichiSessionAPI {
     }
   }
   private schedule(): void {
-    if (this.disposed || this.replaying || this.paused || this.finished || this.botJobs > 0 || this.timer !== null) return;
+    if (this.disposed || this.replaying || this.presentationPaused || this.paused || this.finished || this.botJobs > 0 || this.timer !== null) return;
     if (this.pending && !this.options.autoPlay && !this.quickChoice()) return;
     const generation = this.generation;
     this.timer = setTimeout(() => {
@@ -467,7 +478,7 @@ export class RiichiSession implements RiichiSessionAPI {
     return chooseQuickAction(this.pending.choices, this.quickControls, drawn?.id);
   }
   private advance(): void {
-    if (this.pending || this.paused || this.finished || this.disposed || this.botJobs > 0) return;
+    if (this.pending || this.paused || this.finished || this.disposed || this.botJobs > 0 || this.presentationPaused && !this.replaying) return;
     this.step++;
     this.game.next();
     this.publish();
@@ -506,6 +517,16 @@ export class RiichiSession implements RiichiSessionAPI {
     this.options.autoPlay = enabled;
     if (!enabled) { this.autoPlayRequestVersion++; this.autoPlayService.cancel(); this.tanyaoService.cancel('autoplay'); }
     this.cancelTimer(); this.publish(); this.schedule();
+  }
+  setPresentationPaused(paused: boolean): void {
+    if (this.presentationPaused === paused || this.disposed) return;
+    this.presentationPaused = paused;
+    this.cancelTimer();
+    if (!paused) {
+      const replies = this.presentationReplies; this.presentationReplies = [];
+      for (const reply of replies) reply();
+    }
+    this.publish(); this.schedule();
   }
   setAutoPlayDifficulty(difficulty: Difficulty): void {
     if (!validDifficulty(difficulty) || !this.options.autoPlayMatchDifficulty && this.options.autoPlayDifficulty === difficulty) return;
@@ -582,7 +603,7 @@ export class RiichiSession implements RiichiSessionAPI {
     return { ...this.getSavedGame(), rules: structuredClone(this.rule), log: this.finished ? structuredClone(this.game._paipu) : [...this.log] };
   }
   loadSavedGame(data: SavedGame): boolean {
-    if (!data || data.version !== 1 || (data.mode != null && data.mode !== 'riichi') || (data.difficulty != null && !validDifficulty(data.difficulty)) || (data.aiVersion != null && ![1, 2, 3, 4, 5, 6, 7, AI_VERSION].includes(data.aiVersion)) || typeof data.seed !== 'string' || !['single', 'east', 'hanchan', 'endless'].includes(data.matchLength) || !Array.isArray(data.decisions) || data.decisions.length > 10000 || !data.decisions.every(decision => decision && typeof decision.key === 'string')) return false;
+    if (!data || data.version !== 1 || (data.mode != null && data.mode !== 'riichi') || (data.difficulty != null && !validDifficulty(data.difficulty)) || (data.aiVersion != null && ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, AI_VERSION].includes(data.aiVersion)) || typeof data.seed !== 'string' || !['single', 'east', 'hanchan', 'endless'].includes(data.matchLength) || !Array.isArray(data.decisions) || data.decisions.length > 10000 || !data.decisions.every(decision => decision && typeof decision.key === 'string')) return false;
     try { validateReplayData(data); } catch { return false; }
     const previous = this.getSavedGame();
     const restore = (save: SavedGame): boolean => {
@@ -630,7 +651,8 @@ export class RiichiSession implements RiichiSessionAPI {
     return succeeded;
   }
   /** Used only on a disposable, isolated session by buildReplayFrames. */
-  async captureReplayFrames(data: SavedGame): Promise<ReplayFrame[]> {
+  async captureReplayFrames(data: SavedGame, options: ReplayCaptureOptions = {}): Promise<ReplayFrame[]> {
+    options.signal?.throwIfAborted();
     validateReplayData(data);
     this.cancelTimer(); this.botService.cancel(); this.autoPlayService.cancel(); this.autoPlayRequestVersion++; this.botJobs = 0;
     this.replaying = true; this.replayFrames = []; this.aiVersion = data.aiVersion ?? 1;
@@ -638,6 +660,7 @@ export class RiichiSession implements RiichiSessionAPI {
     this.initialize({ seed: data.seed, matchLength: data.matchLength, difficulty: data.difficulty || 'standard', autoPlayDifficulty: data.autoPlayDifficulty ?? 'expert', autoPlayMatchDifficulty: data.autoPlayMatchDifficulty ?? false, autoExchangeThree: data.autoExchangeThree ?? false, autoPlay: false, speed: 0, quickControls: DEFAULT_QUICK_CONTROLS }, data.checkpoint);
     let cursor = 0;
     for (let guard = 0; guard < MAX_REPLAY_STEPS; guard++) {
+      options.signal?.throwIfAborted();
       const exactEnd = data.replayPosition != null;
       if (exactEnd && this.step > data.replayPosition!) throw new Error('牌谱结束位置与操作记录不一致。');
       if (cursor === data.decisions.length && (!exactEnd || this.step === data.replayPosition)) break;
@@ -651,6 +674,14 @@ export class RiichiSession implements RiichiSessionAPI {
         const key = data.decisions[cursor++].key;
         const choice = this.pending.choices.find(item => item.key === key);
         if (!choice) throw new Error('牌谱包含当前规则不允许的操作。');
+        if (options.captureDecisions) {
+          const { player, choices } = this.pending;
+          appendReplayDecision(this.replayFrames!, { actualKey: choice.key,
+            actions: choices.map(({ key, type, label, tile, tiles }) => ({ key, type, label, tile, tiles })),
+            input: { kind: 'riichi', observation: createBotObservation(player.seatId, player._menfeng, player.shoupai.toString(), player.model, this.options.matchLength),
+              actions: botActions(choices), context: { drawn: typeof player.shoupai._zimo === 'string' && /^[mpsz]\d$/.test(player.shoupai._zimo) ? player.shoupai._zimo : null, furiten: !player._neng_rong } },
+            sourceAiVersion: this.aiVersion });
+        }
         this.choosePending(choice);
         // Legacy files have no precise progress marker. Commit only their final
         // explicit action; a final pass must not invent a subsequent draw.
@@ -663,7 +694,7 @@ export class RiichiSession implements RiichiSessionAPI {
       || this.aiVersion >= 7 && this.botDecisions.length !== (data.botDecisions || []).length) throw new Error('牌谱未能在记录的位置结束，可能已损坏或超限。');
     return finishReplayFrames(this.replayFrames);
   }
-  dispose(): void { this.disposed = true; this.generation++; this.autoPlayRequestVersion++; this.cancelTimer(); this.listeners.clear(); this.pending = null; this.botService.cancel(); this.autoPlayService.cancel(); this.tanyaoService.dispose(); this.deferredBots = []; this.botJobs = 0; }
+  dispose(): void { this.disposed = true; this.generation++; this.autoPlayRequestVersion++; this.cancelTimer(); this.listeners.clear(); this.pending = null; this.botService.cancel(); this.autoPlayService.cancel(); this.tanyaoService.dispose(); this.deferredBots = []; this.presentationReplies = []; this.botJobs = 0; }
 }
 
 export function createSession(options: SessionOptions = {}): RiichiSessionAPI { return new RiichiSession(options); }

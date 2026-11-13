@@ -1,4 +1,6 @@
-import type { Difficulty } from './ai/types';
+import type { BotAction, BotObservation, Difficulty } from './ai/types';
+import type { RegionalBotInput } from './ai/regional';
+import type { TanyaoContext } from './ai/models/tanyaoFeatures';
 /** Public, information-safe view. m/p/s 1-9, z 1-7; 0 is a red five, f1-f8 are flowers. */
 export type TileCode = string;
 export type ModeId = 'riichi' | 'sanma' | 'mcr' | 'sichuan-blood' | 'sichuan-river' | 'hongkong' | 'guangdong' | 'taiwan' | 'hangzhou' | 'wuhan' | 'changsha' | 'northeast';
@@ -276,11 +278,39 @@ export interface SavedGame {
   /** Exact engine progress for new saves; legacy saves omit this boundary. */
   replayPosition?: number;
 }
+export interface ReplayCaptureOptions {
+  signal?: AbortSignal;
+  captureDecisions?: boolean;
+}
+export interface ReplayDecisionAction {
+  key: string;
+  type: ActionType;
+  label: string;
+  tile?: TileCode;
+  tiles?: TileCode[];
+}
+export type ReplayAnalysisInput = {
+  kind: 'riichi';
+  observation: BotObservation;
+  actions: BotAction[];
+  context: TanyaoContext;
+} | {
+  kind: 'regional';
+  input: RegionalBotInput;
+};
+/** Captured immediately before a recorded human action using that player's information. */
+export interface ReplayDecisionPoint {
+  actualKey: string;
+  actions: ReplayDecisionAction[];
+  input: ReplayAnalysisInput;
+  sourceAiVersion: number;
+}
 export interface ReplayFrame {
   snapshot: GameSnapshot;
   actionIndex: number;
   actionLabel: string;
   roundKey: string;
+  decision?: ReplayDecisionPoint;
   /** Added only by isolated replay reconstruction after a confirmed completed ending. */
   allHands?: Record<number, TileCode[]>;
 }
@@ -299,6 +329,8 @@ export interface RiichiSessionAPI {
   setAutoExchangeThree(enabled: boolean): void;
   setQuickControls(controls: Partial<QuickControls>): void;
   setSpeed(milliseconds: number): void;
+  /** Pauses automatic progression during the current presentation without changing saved state. */
+  setPresentationPaused(paused: boolean): void;
   exportReplay(): ReplayData;
   getSavedGame(): SavedGame;
   loadSavedGame(data: SavedGame): boolean;

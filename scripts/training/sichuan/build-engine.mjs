@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { resolve, join, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export async function buildEngine(source, output, features = true, dependencyPath) {
+export async function buildEngine(source, output, features = true, dependencyPath, additionalExports = []) {
   source = resolve(source);
   output = resolve(output);
   const projectLockBytes = await readFile(join(source, 'package-lock.json'));
@@ -27,13 +27,16 @@ export async function buildEngine(source, output, features = true, dependencyPat
     `export { createGameSession } from ${JSON.stringify(join(source, 'src/game/runtime.ts'))};`,
     `export { RiichiSession } from ${JSON.stringify(join(source, 'src/game/index.ts'))};`,
     `export { chooseRegionalAction } from ${JSON.stringify(join(source, 'src/game/ai/regional.ts'))};`,
+    `export { seededRandom } from ${JSON.stringify(join(source, 'src/game/variants/tiles.ts'))};`,
     `export { createRecordStore } from ${JSON.stringify(join(source, 'src/records/store.ts'))};`,
   ];
   if (features) {
     exports.push(`export * from ${JSON.stringify(join(source, 'src/game/ai/models/sichuanFeatures.ts'))};`);
     exports.push(`export * from ${JSON.stringify(join(source, 'src/game/ai/models/sichuanRuntime.ts'))};`);
     exports.push(`export * from ${JSON.stringify(join(source, 'src/game/ai/models/sichuanHybrid.ts'))};`);
+    exports.push(`export * from ${JSON.stringify(join(source, 'src/game/ai/models/sichuanProposal.ts'))};`);
   }
+  exports.push(...additionalExports);
   await build({
     stdin: { contents: exports.join('\n'), resolveDir: source, loader: 'ts' },
     bundle: true, platform: 'node', format: 'esm', target: 'node22', outfile: output,
