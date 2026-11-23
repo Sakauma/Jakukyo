@@ -1,16 +1,19 @@
+import { useHintProps } from '../presentation/PixelHints';
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { GameSnapshot } from '../game/types';
 import { RIVER_COLUMNS, visibleDiscards } from './riverLayout';
 import { TilePortrait } from './TilePortrait';
+import { IndexedRiverTile } from './IndexedRiverTile';
 import type { TableTheme } from './themes';
 import { tileName } from './tileTextures';
 import { getRiverMatches } from '../presentation/riverMatches';
 
-export function RiverOverview({ snapshot, theme, onClose, highlightedTile = null }: { snapshot: GameSnapshot; theme: TableTheme; onClose: () => void; highlightedTile?: string | null }) {
+export function RiverOverview({ snapshot, theme, onClose, highlightedTile = null, initialSeat }: { snapshot: GameSnapshot; theme: TableTheme; onClose: () => void; highlightedTile?: string | null; initialSeat?: number }) {
+  const hintProps = useHintProps();
   const matches = getRiverMatches(snapshot.players, highlightedTile, snapshot);
   const dialog = useRef<HTMLElement>(null);
-  const [seat, setSeat] = useState<number | 'all'>(() => window.matchMedia('(orientation:landscape) and (max-height:500px) and (max-width:1100px)').matches ? snapshot.humanId : 'all');
+  const [seat, setSeat] = useState<number | 'all'>(() => initialSeat ?? (window.matchMedia('(orientation:landscape) and (max-height:500px) and (max-width:1100px)').matches ? snapshot.humanId : 'all'));
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
@@ -41,7 +44,9 @@ export function RiverOverview({ snapshot, theme, onClose, highlightedTile = null
       const tiles = visibleDiscards(player.discards);
       const playerMatches = matches.byPlayer.find(item => item.playerId === player.id)!;
       return <article className="river-history" key={player.id}><header><div>{seat === 'all' ? <button type="button" className="river-player-focus" aria-label={`放大${player.name}的牌河`} onClick={() => selectSeat(player.id)}>{player.wind} · {player.name}<span aria-hidden="true">↗</span></button> : <strong>{player.wind} · {player.name}</strong>}{matches.tile && <b className="river-match-count">牌河 {playerMatches.inRiverCount} · 副露 {playerMatches.inMeldCount}</b>}</div><span>{tiles.length} 张</span></header>
-        {tiles.length ? Array.from({ length: Math.ceil(tiles.length / RIVER_COLUMNS) }, (_, row) => <div className="river-history-row" key={row}><small>{row * RIVER_COLUMNS + 1}</small>{tiles.slice(row * RIVER_COLUMNS, (row + 1) * RIVER_COLUMNS).map(tile => <span key={tile.sourceIndex} className={`river-history-tile ${tile.sideways ? 'is-riichi' : ''}`} title={tile.sideways ? `${tileName(tile.tile)} · 立直宣言牌` : undefined}><TilePortrait tile={tile.tile} theme={theme} matched={playerMatches.inRiverIndices.includes(tile.sourceIndex)} /></span>)}</div>) : <p className="river-empty">尚未出牌</p>}
+        {tiles.length ? Array.from({ length: Math.ceil(tiles.length / RIVER_COLUMNS) }, (_, row) => <div className="river-history-row" key={row}><small>{row * RIVER_COLUMNS + 1}</small>{tiles.slice(row * RIVER_COLUMNS, (row + 1) * RIVER_COLUMNS).map(tile => theme.pixel
+          ? <IndexedRiverTile key={tile.sourceIndex} className="river-history-tile" tile={tile} theme={theme} match={playerMatches.inRiverIndices.includes(tile.sourceIndex)} latest={snapshot.lastDiscard?.playerId===player.id && snapshot.lastDiscard.riverIndex===tile.sourceIndex} />
+          : <span key={tile.sourceIndex} className={`river-history-tile ${tile.sideways ? 'is-riichi' : ''}`} {...hintProps(tile.sideways ? `${tileName(tile.tile)} · 立直宣言牌` : undefined)}><TilePortrait tile={tile.tile} theme={theme} matched={playerMatches.inRiverIndices.includes(tile.sourceIndex)} /></span>)}</div>) : <p className="river-empty">尚未出牌</p>}
       </article>;
     })}</div></div>
   </section></div>;

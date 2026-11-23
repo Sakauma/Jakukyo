@@ -1,6 +1,9 @@
 import type { TableSound, WinSoundTier } from './types';
+import { isMeldCall, type MeldCall, type MotionStyle } from '../presentation/tableTimeline';
 
-export type SampleName = TableSound | `win-${WinSoundTier}`;
+export type SampleName = TableSound | `pixel-${MeldCall}` | `win-${WinSoundTier}`;
+export const tableSample = (sound: TableSound, style: MotionStyle): SampleName =>
+  style === 'pixel' && isMeldCall(sound) ? `pixel-${sound}` : sound;
 
 function random(seed: number) {
   let state = seed >>> 0;
@@ -51,6 +54,45 @@ function mallet(output: Float32Array, rate: number, at: number, frequency: numbe
   }
 }
 
+// A gated pulse with a finite harmonic series, not a bit crusher over the
+// acoustic recording. Short envelopes keep the high edge off repeated calls.
+function chip(output: Float32Array, rate: number, at: number, hz: number, strength: number, length: number, duty = .25) {
+  const start = Math.round(at * rate);
+  const partials = [1, 2, 3, 4, 5].map(n => hz*n < rate*.45 ? Math.sin(Math.PI*n*duty)/(n*n*duty) : 0);
+  for (let i=0; i<length*rate && start+i<output.length; i++) {
+    const t=i/rate, p=t/length, phase=TAU*hz*t;
+    const env=Math.min(1,t/.0016,(length-t)/.006)*Math.exp(-3*p);
+    let wave=0; for(let k=0;k<partials.length;k++) wave+=partials[k]*Math.sin(phase*(k+1));
+    output[start+i]+=strength*wave*env;
+  }
+}
+
+const callLengths = { chi:.17, pon:.18, kan:.29 };
+function soundMeld(data:Float32Array, rate:number, kind:MeldCall, pixel:boolean, seed:number):number {
+  const tap=(at:number, amount:number, material:'tile'|'felt'|'stick'='tile')=>impact(data,rate,at,amount,seed+Math.round(at*10000),material);
+  if (pixel) {
+    // A two-notch rise, a dry unison double, and a low downbeat with a fifth.
+    tap(0,kind==='kan' ? .43 : .26,'felt');
+    if(kind==='chi') {
+      chip(data,rate,0,660,.18,.045); chip(data,rate,.032,880,.13,.068);
+    } else if(kind==='pon') {
+      chip(data,rate,0,360,.25,.034,.4); chip(data,rate,.038,320,.32,.077,.4); tap(.038,.22);
+    } else {
+      chip(data,rate,0,147,.31,.13,.48); chip(data,rate,0,294,.19,.055);
+      chip(data,rate,.061,440,.20,.105,.33); chip(data,rate,.082,587,.074,.105);
+    }
+  } else if(kind==='chi') {
+    tap(0,.77); friction(data,rate,0,.048,.21,seed);
+    mallet(data,rate,.003,740,.12,.023); mallet(data,rate,.028,988,.064,.026);
+  } else if(kind==='pon') {
+    tap(0,.88); tap(0,.62,'felt'); tap(.031,.57,'stick'); mallet(data,rate,.030,247,.12,.033);
+  } else {
+    tap(0,1,'felt'); tap(0,.72); mallet(data,rate,0,131,.29,.054);
+    tap(.043,.45,'stick'); mallet(data,rate,.044,392,.17,.052); mallet(data,rate,.052,587,.07,.048);
+  }
+  return {chi:.46,pon:.62,kan:.73}[kind];
+}
+
 function capAndFade(data: Float32Array, peak: number, rate: number) {
   const maximum = data.reduce((value, sample) => Math.max(value, Math.abs(sample)), .0001);
   const scale = peak / maximum, fade = Math.min(Math.round(rate * .012), data.length / 2);
@@ -66,7 +108,8 @@ export class SoundLibrary {
     const key = `${name}:${variation % 3}`;
     const cached = this.samples.get(key); if (cached) return cached;
     const rate = this.context.sampleRate;
-    const duration = name === 'win-yakuman' ? 2.8 : name === 'win-big' ? 2 : name === 'win-normal' ? 1.3 : name === 'roundEnd' ? .9 : name === 'deal' ? .18 : .5;
+    const pixel = name.startsWith('pixel-'), action = pixel ? name.slice(6) : name;
+    const duration = isMeldCall(action) ? callLengths[action] : name === 'win-yakuman' ? 2.8 : name === 'win-big' ? 2 : name === 'win-normal' ? 1.3 : name === 'roundEnd' ? .9 : name === 'deal' ? .18 : .5;
     const buffer = this.context.createBuffer(1, Math.ceil(rate * duration), rate), data = buffer.getChannelData(0);
     const seed = 317 + variation * 7919;
     const tap = (at: number, strength = .7, material: 'tile' | 'felt' | 'stick' = 'tile') => impact(data, rate, at, strength, seed + Math.round(at * 10000), material);
@@ -74,9 +117,7 @@ export class SoundLibrary {
     if (name === 'select') { tap(0, .42, 'felt'); tap(.012, .14); peak = .22; }
     else if (name === 'draw') { friction(data, rate, 0, .13, .7, seed); tap(.105, .32); peak = .34; }
     else if (name === 'discard') { tap(0, .85, 'felt'); tap(.007, .68); tap(.037, .12, 'felt'); }
-    else if (name === 'chi') { friction(data, rate, 0, .12, .4, seed); tap(.045, .48); tap(.095, .62); tap(.15, .44, 'felt'); }
-    else if (name === 'pon') { tap(0, .9); tap(.052, .68); tap(.084, .55, 'felt'); }
-    else if (name === 'kan') { tap(0, .86); tap(.045, .75); tap(.098, .66); tap(.157, .7, 'felt'); tap(.168, .36); }
+    else if (isMeldCall(action)) peak = soundMeld(data,rate,action,pixel,seed);
     else if (name === 'riichi') { friction(data, rate, 0, .14, .23, seed); tap(.1, .6, 'stick'); tap(.123, .19, 'stick'); peak = .49; }
     else if (name === 'kita') { tap(0, .54); friction(data, rate, .04, .13, .6, seed); tap(.174, .3, 'felt'); peak = .45; }
     else if (name === 'deal') { tap(0, .5, 'felt'); tap(.014, .32); tap(.038, .18); peak = .31; }

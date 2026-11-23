@@ -1,19 +1,12 @@
 import * as THREE from 'three';
-import { getTheme } from './themes';
+import { flowerName } from '../game/flowerName';
+import { getTheme, themeArtKey } from './themes';
 import type { TableTheme } from './themes';
-import { tileSymbol } from './tileArt';
+import { drawPixelSymbol, PIXEL_TILE_WIDTH, PIXEL_TILE_HEIGHT, tileSymbol } from './tileArt';
+export { tileName } from '../presentation/tileName';
 
 const textures = new Map<string, THREE.CanvasTexture>();
-const numerals = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
-const honors = ['?', '東', '南', '西', '北', '白', '發', '中'];
 const WIDTH = 256, HEIGHT = 352;
-
-export function tileName(code: string) {
-  const suit = code[0], rank = Number(code[1]);
-  if (suit === 'z') return honors[rank] ?? code;
-  if (suit === 'f') return ['花', '春', '夏', '秋', '冬', '梅', '兰', '竹', '菊'][rank] ?? code;
-  return `${rank === 0 ? '赤五' : numerals[rank]}${suit === 'm' ? '万' : suit === 'p' ? '筒' : '条'}`;
-}
 
 function surface(width = WIDTH, height = HEIGHT) {
   const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
@@ -36,17 +29,40 @@ function drawGlyph(ctx: CanvasRenderingContext2D, code: string, theme: TableThem
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillStyle = rank <= 4 ? theme.red : theme.green;
   ctx.font = 'bold 145px "KaiTi", "STKaiti", serif';
-  ctx.fillText(['', '春', '夏', '秋', '冬', '梅', '兰', '竹', '菊'][rank] ?? '花', 128, 155);
+  ctx.fillText(flowerName(code), 128, 155);
   ctx.strokeStyle = rank <= 4 ? theme.green : theme.red; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(74, 267); ctx.quadraticCurveTo(122, 245, 180, 269); ctx.stroke();
   ctx.fillStyle = theme.ink; ctx.font = '30px Georgia, serif'; ctx.fillText(String(rank), 128, 299);
 }
-export function tileSurface(code: string, theme: TableTheme = getTheme()) {
-  const key = `${theme.id}:${code}`;
+export function tileSurface(code: string, theme: TableTheme = getTheme(), small = false, turns = 0) {
+  const riverInk=small && (code[0]==='m' || code[0]==='s');
+  const key = `${themeArtKey(theme)}:${code}${theme.pixel && small ? ':small:' + turns : riverInk ? ':river-ink' : ''}`;
+  if (theme.pixel) {
+    if (!textures.has(key)) {
+      const { canvas, ctx } = surface(PIXEL_TILE_WIDTH, PIXEL_TILE_HEIGHT);
+      ctx.fillStyle = theme.tileFace; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#dbc9a8'; ctx.fillRect(canvas.width - 1, 1, 1, canvas.height - 1); ctx.fillRect(1, canvas.height - 1, canvas.width - 1, 1);
+      ctx.imageSmoothingEnabled = false;
+      if(riverInk) ctx.filter='brightness(.82)';
+      drawPixelSymbol(ctx, code, small, turns);
+      const map = new THREE.CanvasTexture(canvas);
+      map.colorSpace = THREE.SRGBColorSpace;
+      map.magFilter = map.minFilter = THREE.NearestFilter; map.generateMipmaps = false;
+      textures.set(key, map);
+    }
+    return { map: textures.get(key)!, bump: null, roughness: null };
+  }
   if (!textures.has(key)) {
     const glyph = surface(); drawGlyph(glyph.ctx, code, theme);
     const face = surface(); face.ctx.fillStyle = theme.tileFace; face.ctx.fillRect(0, 0, WIDTH, HEIGHT);
-    face.ctx.shadowColor = 'rgba(45,35,26,.28)'; face.ctx.shadowBlur = 1.1; face.ctx.shadowOffsetY = .8;
+    if (riverInk) {
+      // Thicken the original transparent strokes before mipmapping. At far
+      // seats the gain is a fraction of a screen pixel, not an outline or a blur.
+      face.ctx.filter='brightness(.80)';
+      for(const [x,y] of [[-2,0],[2,0],[0,-2],[0,2]]) face.ctx.drawImage(glyph.canvas,x,y);
+    } else {
+      face.ctx.shadowColor = 'rgba(45,35,26,.28)'; face.ctx.shadowBlur = 1.1; face.ctx.shadowOffsetY = .8;
+    }
     face.ctx.drawImage(glyph.canvas, 0, 0); textures.set(key, texture(face.canvas));
     if (!textures.has(`engraving:${code}`)) {
       const image = glyph.ctx.getImageData(0, 0, WIDTH, HEIGHT), bump = surface(128, 176), rough = surface(128, 176);
@@ -66,6 +82,28 @@ export function tileSurface(code: string, theme: TableTheme = getTheme()) {
 }
 
 export function tileTexture(code: string, theme: TableTheme = getTheme()) { return tileSurface(code, theme).map; }
+
+/** A two-ink woven knot, painted on the reverse only (not stretched over the sides). */
+export function pixelBackTexture(theme: TableTheme) {
+  const key = `pixel-back:${theme.id}`;
+  if (!textures.has(key)) {
+    const { canvas, ctx } = surface(32, 44);
+    // A stamped split feather, with a single light cut and two clipped corners.
+    // All closed backs share the die, regardless of the concealed tile code.
+    ctx.fillStyle = theme.background; ctx.fillRect(0,0,32,44);
+    ctx.fillStyle = theme.tileBack; ctx.fillRect(2,2,28,40);
+    ctx.fillStyle = theme.ui.border;
+    for(const [x,y,w,h] of [[3,3,16,1],[3,4,1,11],[12,40,17,1],[28,29,1,11]]) ctx.fillRect(x,y,w,h);
+    const feather=['........##','......####','.....###.#','...####.#.','..####.##.','.###..##..','###.###...','##.###....','..###.....','.##.......'];
+    if(theme.motif!=='plain') feather.forEach((line,y)=>[...line].forEach((p,x)=>{
+      if(p==='#')ctx.fillRect(6+x*2,11+y*2,2,2);
+    }));
+    else ctx.fillRect(10,20,12,3);
+    const map = new THREE.CanvasTexture(canvas); map.colorSpace = THREE.SRGBColorSpace;
+    map.magFilter = THREE.NearestFilter; textures.set(key, map);
+  }
+  return textures.get(key)!;
+}
 
 function noise(seed: number) {
   let value = seed;

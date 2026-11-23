@@ -13,7 +13,7 @@ export interface WallTileTransform {
 export const visibleWallCount = (remaining: number, reserve: number) => Math.max(reserve, Math.min(112, remaining + reserve));
 
 /** One mildly skewed, offset wall transform shared by the table and draw origins. */
-export function wallTileTransform(index: number, indicators: readonly string[] = []): WallTileTransform {
+export function wallTileTransform(index: number, indicators: readonly string[] = [], extraX=0, rear=0): WallTileTransform {
   const side = Math.floor(index / 34), stack = Math.floor((index % 34) / 2), layer = index % 2;
   const base = (2 - side) * Math.PI / 2, yaw = base + WALL_LAYOUT.tilt;
   const along = -(stack - 8) * .575 * WALL_LAYOUT.scale + WALL_LAYOUT.offset;
@@ -22,8 +22,13 @@ export function wallTileTransform(index: number, indicators: readonly string[] =
   const rotation: [number, number, number] = [tile ? -Math.PI / 2 : Math.PI / 2, 0, tile ? yaw : -yaw];
   const stackHeight = layer * .395 * WALL_LAYOUT.scale;
   return { tile, rotation, scale: WALL_LAYOUT.scale, stackHeight,
-    position: [Math.cos(base) * x + Math.sin(base) * z, tileRestHeight(rotation, WALL_LAYOUT.scale) + stackHeight, -Math.sin(base) * x + Math.cos(base) * z] };
+    position: [Math.cos(base) * x + Math.sin(base) * z + (extraX && side%2 ? (side===1 ? 1 : -1)*(extraX+.65) : 0),
+      tileRestHeight(rotation, WALL_LAYOUT.scale) + stackHeight,
+      -Math.sin(base) * x + Math.cos(base) * z + (extraX && !(side%2) ? side===0 ? -.75-rear : .45 : 0)] };
 }
+
+export const fieldSeatOffset = (side:number,extraX:number,rear:number): [number,number,number] =>
+  [side===1 ? extraX : side===3 ? -extraX : 0,0,side===2 ? -rear : 0];
 
 /** Convert a world-space wall tile into the destination player's local seat. */
 export function wallTileInSeat(tile: WallTileTransform, angle: number) {

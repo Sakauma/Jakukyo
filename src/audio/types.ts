@@ -1,5 +1,6 @@
 import type { GameSnapshot } from '../game/types';
 import type { RoundPresentation } from '../presentation/roundPresentation';
+import type { MotionStyle } from '../presentation/tableTimeline';
 
 export type TableSound = 'select' | 'draw' | 'discard' | 'chi' | 'pon' | 'kan' | 'riichi' | 'kita' | 'deal' | 'reveal' | 'collect' | 'roundEnd';
 export type WinSoundTier = 'normal' | 'big' | 'yakuman';
@@ -22,11 +23,11 @@ export interface TableAudio {
   unlock(): Promise<boolean>;
   setPreferences(preferences: Partial<AudioPreferences>): void;
   /** First/restored snapshots establish a silent baseline; null resets it. */
-  sync(snapshot: GameSnapshot | null, options?: { reducedMotion?: boolean; presentation?: RoundPresentation | null }): void;
+  sync(snapshot: GameSnapshot | null, options?: { reducedMotion?: boolean; presentation?: RoundPresentation | null; style?: MotionStyle }): void;
   /** Seat is the fixed visible player id: 0 near, 1 right, 2 far, 3 left. */
   play(sound: TableSound, seat?: number): void;
   select(): void;
-  /** A short draw/discard/meld/win sequence, initiated by a user gesture. */
+  /** Draw, discard, the current style's chi/pon/kan, then a win. User initiated. */
   preview(): void;
   previewWin(tier?: WinSoundTier): void;
   dispose(): void;

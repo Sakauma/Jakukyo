@@ -50,6 +50,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.`;
   const queue = Object.keys(source.dependencies ?? {}).map(name => ({ name, from: root }));
   const visited = new Set(), sections = [
+    `\n${'='.repeat(72)}\nMa Shan Zheng: three-glyph offline subset for meld declarations\nSource: https://github.com/googlefonts/mashanzheng\n\n${await readFile(join(root, 'public/licenses/meld-brush.txt'), 'utf8')}`,
+    `\n${'='.repeat(72)}\nBundled pixel UI font and rasterized tile lettering\n\n${await readFile(join(root, 'public/licenses/unifont.txt'), 'utf8')}`,
     `\n${'='.repeat(72)}\nBundled standard mahjong tile artwork\n\nSOURCE.md\n${tileSource}\nLICENSE.md\n${tileLicense}`,
     `\n${'='.repeat(72)}\nBundled MCR local policy model and feature/action adapter\nPublisher: ${modelSource.publisher}\nDeclared license: ${modelSource.license}\nLicense declaration: ${modelSource.licenseDeclaration}\nPinned source and runtime provenance\n${JSON.stringify(modelSource, null, 2)}\n\n${modelLicense}`,
     `\n${'='.repeat(72)}\nBundled TanyaoDojo local riichi policy model and public feature adapter\n${JSON.stringify(riichiSource, null, 2)}\n\n${riichiLicense}`,

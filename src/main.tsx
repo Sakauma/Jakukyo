@@ -7,6 +7,9 @@ import './themes.css';
 import './effects/effects.css';
 import './table/tableUI.css';
 import './mobile.css';
+import './pixelMode.css';
+import './table/printMotion.css';
+import './table/classicMotion.css';
 
 const root = ReactDOM.createRoot(document.getElementById('root')!);
 void prepareTileArt().then(() => {

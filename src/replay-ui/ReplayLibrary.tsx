@@ -1,3 +1,4 @@
+import { useHintProps } from '../presentation/PixelHints';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { CSSProperties } from 'react';
 import { MODES, getMode } from '../game/catalog';
@@ -26,6 +27,7 @@ function exportFile(record: GameRecord) {
 }
 
 function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: TableTheme; onBack: () => void }) {
+  const hintProps = useHintProps();
   const [frames, setFrames] = useState<ReplayFrame[]>([]), [loading, setLoading] = useState(true), [error, setError] = useState('');
   const [index, setIndex] = useState(0), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState(1);
   const [showHands, setShowHands] = useState(false), [view, setView] = useState<'perspective' | 'overhead'>('perspective');
@@ -97,7 +99,7 @@ function ReplayViewer({ record, theme, onBack }: { record: GameRecord; theme: Ta
           <span className="replay-label">当前动作</span><p className="replay-action" aria-live="polite">{displayScoringText(frame.actionLabel || snapshot.message, snapshot.mode, playerNames)}</p>
           <dl><div><dt>玩法</dt><dd>{getMode(record.mode).name}</dd></div><div><dt>对局进度</dt><dd>{index + 1} / {frames.length} 步</dd></div><div><dt>记录状态</dt><dd>{recordStatus(record)}</dd></div></dl>
           <ReplayDecisionPanel frames={frames} index={index} onGo={go} onPause={() => setPlaying(false)} theme={theme} />
-          <label className="replay-reveal" title={frame.allHands ? undefined : '本局结束后可查看'}><input type="checkbox" checked={showHands && !!frame.allHands} disabled={!frame.allHands} onChange={event => setShowHands(event.target.checked)} />查看各家手牌</label>
+          <label className="replay-reveal" {...hintProps(frame.allHands ? undefined : '本局结束后可查看')}><input type="checkbox" checked={showHands && !!frame.allHands} disabled={!frame.allHands} onChange={event => setShowHands(event.target.checked)} />查看各家手牌</label>
           {hasScoring && <button className="replay-scoring-open" type="button" onClick={() => { setPlaying(false); setShowScoring(true); }}>查看计分明细</button>}
           
           {!!snapshot.round.doraIndicators.length && <div className="replay-dora"><span>宝牌指示牌</span><div>{snapshot.round.doraIndicators.map((tile, at) => <TilePortrait key={at} tile={tile} theme={theme} />)}</div></div>}

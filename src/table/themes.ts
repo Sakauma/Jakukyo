@@ -3,6 +3,8 @@ export type ThemeId = 'jade' | 'sakura' | 'midnight' | 'contrast';
 /** A theme changes the actual lit table and tiles as well as the surrounding UI. */
 export interface TableTheme {
   id: ThemeId;
+  /** Rendering style is independent of the chosen room (and its audio). */
+  pixel?: boolean;
   name: string;
   subtitle: string;
   motif: 'weave' | 'petal' | 'stars' | 'plain';
@@ -52,8 +54,30 @@ export const TABLE_THEMES: TableTheme[] = [
   },
 ];
 
-export function getTheme(id?: string): TableTheme {
-  return TABLE_THEMES.find(theme => theme.id === id) ?? TABLE_THEMES[0];
+// Each room has its own cartridge palette. Keep these objects stable: GPU materials
+// and portraits are shared by the live table, replay viewer and illustrated UI.
+const pixelColors: Record<ThemeId, [field: string, back: string, night: string, panel: string, raised: string, line: string, accent: string, muted: string]> = {
+  jade:     ['#326e62', '#246653', '#132a2c', '#1c3839', '#2b5050', '#608d79', '#ffcf73', '#b4d4ba'],
+  sakura:   ['#855870', '#873f66', '#302237', '#443047', '#63435d', '#aa7993', '#ffc998', '#e5c4d0'],
+  midnight: ['#38547c', '#334d83', '#18243c', '#263651', '#374d70', '#708bb4', '#a9e5ec', '#bdcde6'],
+  contrast: ['#384d58', '#263c4b', '#101820', '#1b2834', '#344655', '#a5bdcc', '#ffe780', '#e7eef3'],
+};
+const printRails: Record<ThemeId,string> = { jade:'#67483b', sakura:'#6e4549', midnight:'#323c57', contrast:'#36434b' };
+const pixelRooms = TABLE_THEMES.map((theme): TableTheme => {
+  const [felt, tileBack, background, panel, raised, border, accent, muted] = pixelColors[theme.id];
+  const face = theme.id === 'contrast' ? '#ffffff' : '#fff2d4';
+  return { ...theme, pixel: true, background, felt, rail: printRails[theme.id], trim: accent, tileFace: face, tileBack,
+    ink: '#243746', red: '#af3442', green: '#126453', light: '#ffffff', fillLight: '#e0eee7',
+    ui: { surface: background, panel, raised, text: face, muted, accent, border } };
+});
+
+export function themeArtKey(theme: TableTheme) {
+  return theme.pixel ? `pixel:${theme.id}` : theme.id;
+}
+
+export function getTheme(id?: string, pixel = false): TableTheme {
+  const rooms = pixel ? pixelRooms : TABLE_THEMES;
+  return rooms.find(theme => theme.id === id) ?? rooms[0];
 }
 
 export function tableSeat(id: number, playerCount: number): number {

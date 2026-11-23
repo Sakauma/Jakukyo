@@ -1,3 +1,4 @@
+import { useHintProps } from '../presentation/PixelHints';
 import type { GameSnapshot, HandTile, RiichiFuritenReason } from '../game/types';
 import { TilePortrait } from '../table/TilePortrait';
 import { tileName } from '../table/tileTextures';
@@ -18,6 +19,7 @@ const furitenNames: Record<RiichiFuritenReason, string> = {
 
 /** This component receives only the engine's public-information hint view. */
 export function RiichiAssistPanel({ snapshot, selectedTile, riichiMode, theme, showDetails = true }: Props) {
+  const hintProps = useHintProps();
   const assist = snapshot.riichiAssist;
   if (!assist || snapshot.status !== 'playing' || !['riichi', 'sanma'].includes(snapshot.mode ?? 'riichi')) return null;
   const legalWin = snapshot.actions.find(action => action.type === 'ron' || action.type === 'tsumo');
@@ -58,7 +60,7 @@ export function RiichiAssistPanel({ snapshot, selectedTile, riichiMode, theme, s
       <ul className="assist-waits" aria-label="牌形听张与公开未见数">{displayedWaits.map(wait => {
         const yakuLabel = wait.ronYaku ? '有役' : declaredYaku ? '立直后有役' : '无役';
         return <li key={wait.tile} className={`${wait.unseen === 0 ? 'is-exhausted' : ''} ${wait.ronYaku || declaredYaku ? 'has-yaku' : ''}`}
-          title={`${tileName(wait.tile)} · 未见 ${wait.unseen} 张 · ${yakuLabel}`}>
+          {...hintProps(`${tileName(wait.tile)} · 未见 ${wait.unseen} 张 · ${yakuLabel}`)}>
           <TilePortrait tile={wait.tile} theme={theme} /><span><b>×{wait.unseen}</b><em>{denseWaits && declaredYaku && !wait.ronYaku ? '立直' : yakuLabel}</em></span>
         </li>;
       })}</ul>

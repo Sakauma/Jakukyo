@@ -1,6 +1,9 @@
 import type { GameSnapshot } from '../game/types';
 
 export type TableMotionKind = 'draw' | 'discard' | 'chi' | 'pon' | 'kan' | 'riichi' | 'kita';
+export type MotionStyle = 'classic' | 'pixel';
+export type MeldCall = 'chi' | 'pon' | 'kan';
+export const isMeldCall = (kind: string): kind is MeldCall => kind === 'chi' || kind === 'pon' || kind === 'kan';
 export interface TableMotionCue {
   key: string;
   kind: TableMotionKind;
@@ -8,8 +11,9 @@ export interface TableMotionCue {
   riverIndex?: number;
   meldIndex?: number;
   /** A called tile is already public; this never identifies a concealed tile. */
-  source?: { seat: number; riverIndex: number; tile: string };
-  addedTiles?: number[];
+  source?: { seat: number; riverIndex: number; tile: string; tileIndex: number };
+  /** A rack-side slide is justified by the public declaration, not by a guessed giver. */
+  kanEntry?: 'concealed' | 'added';
   /** Supplementary flower exposure may be atomic; preserve foley without inventing a concealed move. */
   flowerSupplement?: boolean;
 }
@@ -45,11 +49,17 @@ export function tableMotionCues(before: GameSnapshot, current: GameSnapshot): Ta
     player.melds.forEach((meld, index) => {
       const oldMeld = old.melds[index];
       if (oldMeld && oldMeld.type === meld.type && oldMeld.tiles.join() === meld.tiles.join()) return;
-      const added = oldMeld && meld.tiles.length > oldMeld.tiles.length
-        ? Array.from({ length: meld.tiles.length - oldMeld.tiles.length }, (_, i) => oldMeld.tiles.length + i)
-        : meld.tiles.map((_, i) => i);
-      const source = !meld.concealed ? called.find(item => meld.from == null || item.seat === meld.from) : undefined;
-      cues.push({ key: `${scope}:meld:${player.id}:${index}:${meld.type}:${meld.tiles.join('')}`, kind: meld.type, seat: player.id, meldIndex: index, source, addedTiles: added });
+      // A pon upgraded in place retains its old giver; that is NOT a new discard.
+      // Only a fresh, matching public claim has a piece to slide. Respect red fives.
+      const take = !oldMeld && !meld.concealed ? called.find(item => item.seat !== player.id
+        && (meld.from == null || item.seat === meld.from)
+        && (meld.calledIndex == null ? meld.tiles.includes(item.tile) : meld.tiles[meld.calledIndex] === item.tile)) : undefined;
+      const source = take && { ...take, tileIndex: meld.calledIndex ?? meld.tiles.lastIndexOf(take.tile) };
+      const kanEntry = meld.type==='kan' && meld.tiles.length===4
+        ? !oldMeld && meld.concealed ? 'concealed'
+          : oldMeld?.type==='pon' && !meld.concealed && oldMeld.tiles.length===3 && oldMeld.tiles.every((t,i)=>t===meld.tiles[i]) ? 'added' : undefined
+        : undefined;
+      cues.push({ key: `${scope}:meld:${player.id}:${index}:${meld.type}:${meld.tiles.join('')}`, kind: meld.type, seat: player.id, meldIndex: index, source, kanEntry });
     });
     if (player.riichi && !old.riichi) cues.push({ key: `${scope}:riichi:${player.id}`, kind: 'riichi', seat: player.id });
     if ((player.kita ?? 0) > (old.kita ?? 0)) cues.push({ key: `${scope}:kita:${player.id}:${player.kita}`, kind: 'kita', seat: player.id });
@@ -64,10 +74,24 @@ export function tableMotionCues(before: GameSnapshot, current: GameSnapshot): Ta
 }
 
 /** All visual arrivals finish before the next fastest visible engine step. */
-export function motionDuration(kind: TableMotionKind, speed: number, reduced = false): number {
-  if (reduced || speed <= 0) return 0;
-  const normal: Record<TableMotionKind, number> = { draw: 210, discard: 230, chi: 225, pon: 225, kan: 235, riichi: 220, kita: 205 };
-  return Math.min(normal[kind], Math.max(0, speed * .78));
+const pixelLength = { draw:210, discard:230, chi:225, pon:225, kan:235, riichi:220, kita:205 };
+// Normal play: a single, readable stroke, not a wind-up / flight / slide.
+// Keep the last clack of the existing foley inside the shortest engine step.
+const classicLength = { draw:168, discard:160, chi:160, pon:128, kan:232, riichi:164, kita:184 };
+export const continuousClaimPreview = import.meta.env.MODE === 'claim-preview';
+export const riverClaimMs = 288;
+export function motionDuration(kind: TableMotionKind, speed: number, reduced = false, style: MotionStyle = 'pixel', continuousClaims = continuousClaimPreview): number {
+  if (reduced || speed <= 0 || !Number.isFinite(speed)) return 0;
+  if (style==='pixel') return Math.min(pixelLength[kind],speed*.78);
+  const travel=continuousClaims && (kind==='chi' || kind==='pon') ? riverClaimMs : classicLength[kind];
+  return Math.min(travel,speed*.8);
+}
+
+type CueAction = Pick<TableMotionCue,'kind'|'source'|'kanEntry'>;
+/** The arrival drives both the word and the sound. Ambiguous historical
+ * changes have no slide; neither do reduced motion and zero-speed play. */
+export function cueTravel(cue:CueAction, speed:number, reduced=false, style:MotionStyle='pixel', continuousClaims=continuousClaimPreview) {
+  return isMeldCall(cue.kind) && !cue.source && !cue.kanEntry ? 0 : motionDuration(cue.kind,speed,reduced,style,continuousClaims);
 }
 
 /** Add only the missing observation time; the normal engine step already waits for speed. */
@@ -77,19 +101,8 @@ export function actionObservationDelay(cues: readonly TableMotionCue[], speed: n
   return Math.max(0, ...cues.map(cue => (windows[cue.kind] ?? 0) - speed));
 }
 
-// Existing sample contact offsets, in milliseconds. Keep the sound design intact.
-const contacts: Record<TableMotionKind, number[]> = {
-  draw: [105], discard: [0], chi: [45, 95, 150], pon: [0, 52, 84], kan: [0, 45, 98, 168], riichi: [100], kita: [174],
-};
-
-export function soundStartDelay(kind: TableMotionKind, speed: number, reduced = false): number {
-  if (reduced) return 0;
-  return Math.max(0, motionDuration(kind, speed) - contacts[kind].at(-1)!);
-}
-
-/** Meld tiles contact the cloth in the rhythm already present in the sample. */
-export function tileArrivalTime(kind: TableMotionKind, speed: number, tileIndex = 0, reduced = false): number {
-  if (reduced || speed <= 0) return 0;
-  const pattern = contacts[kind], beat = pattern[Math.min(tileIndex, pattern.length - 1)];
-  return Math.min(motionDuration(kind, speed), soundStartDelay(kind, speed) + beat);
+// Meld samples attack immediately. Other recordings have a lead-in to contact.
+const leadIn = { draw:105, discard:0, chi:0, pon:0, kan:0, riichi:100, kita:174 };
+export function soundStartDelay(cue:CueAction, speed:number, reduced=false, style:MotionStyle='pixel') {
+  return Math.max(0, cueTravel(cue,speed,reduced,style) - leadIn[cue.kind]);
 }

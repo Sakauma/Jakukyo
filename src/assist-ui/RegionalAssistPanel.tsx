@@ -1,3 +1,4 @@
+import { useHintProps } from '../presentation/PixelHints';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GameSessionAPI, GameSnapshot, HandTile, RegionalWaitView, RonNotice } from '../game/types';
 import { publicWaitCounts } from '../game/assist/publicWaitCounts';
@@ -27,6 +28,7 @@ const qualificationLabel = (status?: RegionalWaitView['status']) => status === '
 
 /** Previews use the same rule-qualified waits as the regional engine. */
 export function RegionalAssistPanel({ snapshot, session, selectedTile, notice, theme, showDetails }: Props) {
+  const hintProps = useHintProps();
   const [detailTile, setDetailTile] = useState<string | null>(null);
   const panel = useRef<HTMLElement>(null);
   const detailPanel = useRef<HTMLDivElement>(null);
@@ -86,7 +88,7 @@ export function RegionalAssistPanel({ snapshot, session, selectedTile, notice, t
       const detail = waitDetails.find(item => item.tile === wait.tile);
       const label = qualificationLabel(detail?.status);
       const description = [tileName(wait.tile), `未见 ${wait.unseen} 张`, label, ...(detail?.reasons ?? [])].join(' · ');
-      return <li key={wait.tile} className={`${wait.unseen === 0 ? 'is-exhausted' : ''} wait-${detail?.status ?? 'unknown'}`}><button type="button" title={description} aria-label={description} aria-expanded={detailTile === wait.tile} onClick={() => setDetailTile(detailTile === wait.tile ? null : wait.tile)}><TilePortrait tile={wait.tile} theme={theme} /><span><b>×{wait.unseen}</b><em>{label}</em></span></button></li>;
+      return <li key={wait.tile} className={`${wait.unseen === 0 ? 'is-exhausted' : ''} wait-${detail?.status ?? 'unknown'}`}><button type="button" {...hintProps(description)} aria-label={description} aria-expanded={detailTile === wait.tile} onClick={() => setDetailTile(detailTile === wait.tile ? null : wait.tile)}><TilePortrait tile={wait.tile} theme={theme} /><span><b>×{wait.unseen}</b><em>{label}</em></span></button></li>;
     })}</ul></div>}
     {selectedDetail && <div ref={detailPanel} className="assist-wait-detail" role="status"><strong>{tileName(selectedDetail.tile)} · {qualificationLabel(selectedDetail.status)}</strong><div>{selectedDetail.ronFan != null && <span>点和 {selectedDetail.ronFan} {countUnit}</span>}{selectedDetail.tsumoFan != null && <span>自摸 {selectedDetail.tsumoFan} {countUnit}</span>}</div>{selectedDetail.reasons.map(reason => <p key={reason}>{reason}</p>)}</div>}
   </section>;

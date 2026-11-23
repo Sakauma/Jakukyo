@@ -4,6 +4,9 @@
   "version": "0.3.4",
   "type": "module",
   "scripts": {
+    "test:classic": "node scripts/check-classic-motion.mjs",
+    "test:meld": "node scripts/check-classic-motion.mjs release/Jakukyo-offline.html --impacts",
+    "test:pixel": "node scripts/test-pixel-mode.mjs",
     "dev": "node scripts/prepare-models.mjs && node scripts/prepare-riichi-model.mjs && vite --host 127.0.0.1",
     "build": "node scripts/prepare-models.mjs && node scripts/prepare-riichi-model.mjs && tsc -b && vite build",
     "build:offline": "node scripts/prepare-models.mjs && node scripts/prepare-riichi-model.mjs && tsc --noEmit && node scripts/offline-build.mjs",
@@ -26,6 +29,7 @@
     "@types/react-dom": "^19.0.4",
     "@types/three": "^0.175.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "playwright-core": "1.62.1",
     "typescript": "~5.7.3",
     "undici": "7.30.2",
     "vite": "^6.2.2"

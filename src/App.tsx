@@ -1,3 +1,4 @@
+import { GameHints, PixelHintLayer, classicHint, pixelHint, useHintProps } from './presentation/PixelHints';
 import { Component, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import MahjongTable from './table/MahjongTable';
@@ -8,6 +9,12 @@ import { createHandOrderController } from './table/handOrder';
 import { riverLayout } from './table/riverLayout';
 import { RiverOverview } from './table/RiverOverview';
 import { SeatFlowers } from './table/SeatFlowers';
+import { TilePortrait } from './table/TilePortrait';
+import { PixelHandRack } from './table/PixelHandRack';
+import { ClassicDeclaration, TableActionNotes } from './presentation/PrintTurn';
+import { DesktopRiverWing, useDesktopPlaySpace, useDesktopRiverSpace } from './table/DesktopRivers';
+import { TableRiverField } from './table/TableRiverField';
+import { DesktopPlayMenu } from './table/DesktopPlayMenu';
 import type { ThemeId } from './table/themes';
 import { createGameSession } from './game/runtime';
 import { getMode, MODES } from './game/catalog';
@@ -76,7 +83,7 @@ class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean
   render() { return this.state.failed ? <div className="webgl-fallback"><strong>3D 牌桌暂时无法启动</strong><p>请启用浏览器的硬件加速，再使用新版 Edge 或 Chrome 打开。</p></div> : this.props.children; }
 }
 
-interface Preferences { speed?: number; sound?: boolean; bgm?: boolean; musicVolume?: number; autoSort?: boolean; riichiHints?: boolean; quickControls?: Partial<QuickControls>; autoPlayDifficulty?: Difficulty; autoPlayMatchDifficulty?: boolean; autoExchangeThree?: boolean; masterVolume?: number; effectsVolume?: number; ambienceVolume?: number; winEffects?: boolean; mode?: ModeId; difficulty?: Difficulty; theme?: ThemeId; matchLength?: SessionOptions['matchLength']; exchangeThree?: boolean; sichuan?: Partial<SichuanOptions> }
+interface Preferences { pixelMode?: boolean; desktopReadView?: boolean; speed?: number; sound?: boolean; bgm?: boolean; musicVolume?: number; autoSort?: boolean; riichiHints?: boolean; quickControls?: Partial<QuickControls>; autoPlayDifficulty?: Difficulty; autoPlayMatchDifficulty?: boolean; autoExchangeThree?: boolean; masterVolume?: number; effectsVolume?: number; ambienceVolume?: number; winEffects?: boolean; mode?: ModeId; difficulty?: Difficulty; theme?: ThemeId; matchLength?: SessionOptions['matchLength']; exchangeThree?: boolean; sichuan?: Partial<SichuanOptions> }
 function readPrefs(): Preferences { try { return JSON.parse(localStorage.getItem(PREF_KEY) ?? localStorage.getItem('jakukyo.preferences.v1') ?? '{}'); } catch { return {}; } }
 function readSave(): SavedGame | null { try { const value = localStorage.getItem(SAVE_KEY); return value ? JSON.parse(value) : null; } catch { return null; } }
 function volume(value: number | undefined, fallback: number) { return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback; }
@@ -85,21 +92,34 @@ function VolumeSlider({ label, value, onChange, disabled }: { label: string; val
   return <label className={`volume-slider ${disabled ? 'volume-disabled' : ''}`}><span>{label}</span><input type="range" min="0" max="100" step="1" value={Math.round(value * 100)} aria-label={label} disabled={disabled} onChange={event => onChange(Number(event.target.value) / 100)} /><output>{Math.round(value * 100)}%</output></label>;
 }
 
-function ThemePicker({ value, onChange }: { value: ThemeId; onChange: (id: ThemeId) => void }) {
-  return <div className="theme-options" role="group" aria-label="牌桌主题">{TABLE_THEMES.map(theme =>
-    <button key={theme.id} type="button" className={`theme-option ${value === theme.id ? 'selected' : ''}`} aria-pressed={value === theme.id} onClick={() => onChange(theme.id)} title={theme.subtitle}>
+function ThemePicker({ value, onChange, pixel }: { value: ThemeId; onChange: (id: ThemeId) => void; pixel: boolean }) {
+  const hintProps = useHintProps();
+  return <div className="theme-options" role="group" aria-label="牌桌主题">{TABLE_THEMES.map(room => getTheme(room.id, pixel)).map(theme =>
+    <button key={theme.id} type="button" className={`theme-option ${value === theme.id ? 'selected' : ''}`} aria-pressed={value === theme.id} onClick={() => onChange(theme.id)} {...hintProps(theme.subtitle)}>
       <span className="theme-sample" style={{ '--swatch-felt': theme.felt, '--swatch-rail': theme.rail, '--swatch-trim': theme.trim, '--swatch-back': theme.tileBack } as CSSProperties}><i /><i /><i /></span>
       <span>{theme.name}</span>
     </button>)}</div>;
 }
 
-function QuickControlButtons({ value, onChange, settings = false }: { value: QuickControls; onChange: (change: Partial<QuickControls>) => void; settings?: boolean }) {
+function PixelModeSwitch({ active, themeId, onToggle }: { active: boolean; themeId: ThemeId; onToggle: () => void }) {
+  return <button type="button" className="pixel-setting" role="switch" aria-label="像素模式"
+    aria-checked={active} aria-describedby="pixel-mode-hint" onClick={onToggle}>
+    <span className="pixel-setting-art" aria-hidden="true"><TilePortrait tile="s1" theme={getTheme(themeId, true)} /></span>
+    <span className="pixel-setting-copy"><strong>像素模式</strong><small id="pixel-mode-hint">使用点阵字和像素牌面，手牌始终正面显示。</small></span>
+    <span className={`switch ${active ? 'on' : ''}`} aria-hidden="true"><span /></span>
+  </button>;
+}
+
+function QuickControlButtons({ value, onChange, settings = false, activeOnly = false }: { value: QuickControls; onChange: (change: Partial<QuickControls>) => void; settings?: boolean; activeOnly?: boolean }) {
+  const hintProps = useHintProps();
   const items: Array<{ key: keyof QuickControls; label: string; description: string }> = [
     { key: 'autoWin', label: '自动和牌', description: '当前操作允许和牌时，自动确认自摸或荣和' },
     { key: 'autoDiscard', label: '自动摸切', description: '没有待确认的和牌时，自动打出可合法舍弃的摸入牌' },
     { key: 'noCall', label: '不鸣牌', description: '自动跳过吃碰杠响应，保留和牌机会' },
   ];
-  return <div className={`quick-controls ${settings ? 'quick-controls-settings' : ''}`} role="group" aria-label={settings ? '快捷操作设置' : '快捷操作'}>{items.map(item => <button key={item.key} type="button" role="switch" aria-checked={value[item.key]} aria-label={`${settings ? '设置' : ''}${item.label}`} title={item.description} className={value[item.key] ? 'is-on' : ''} onClick={() => onChange({ [item.key]: !value[item.key] })}><i />{item.label}</button>)}</div>;
+  const visible = activeOnly ? items.filter(item => value[item.key]) : items;
+  if (!visible.length) return null;
+  return <div className={`quick-controls ${settings ? 'quick-controls-settings' : ''}`} role="group" aria-label={settings ? '快捷操作设置' : '快捷操作'}>{visible.map(item => <button key={item.key} type="button" role="switch" aria-checked={value[item.key]} aria-label={`${settings ? '设置' : ''}${item.label}`} {...hintProps(item.description)} className={value[item.key] ? 'is-on' : ''} onClick={() => onChange({ [item.key]: !value[item.key] })}><i />{item.label}{activeOnly && <span aria-hidden="true"> ×</span>}</button>)}</div>;
 }
 
 function ExchangePolicySelect({ value, onChange, ariaLabel }: { value: boolean; onChange: (value: boolean) => void; ariaLabel: string }) {
@@ -119,7 +139,8 @@ function SichuanRulesPicker({ value, onChange }: { value: SichuanOptions; onChan
 }
 
 function LegalActionButton({ action, onAction }: { action: LegalAction; onAction: (action: LegalAction) => void }) {
-  return <button className={`action-button ${['ron', 'tsumo'].includes(action.type) ? 'win-button' : ''} ${action.type === 'pass' ? 'pass-button' : ''}`} aria-label={`${action.label}${action.tiles?.length ? ` ${action.tiles.map(tileName).join(' ')}` : ''}`} title={action.description} onClick={() => onAction(action)}><span>{action.label}</span>{!!action.tiles?.length && <small className="action-tiles">{action.tiles.map((tile, i) => <i key={i}>{tileName(tile)}</i>)}</small>}</button>;
+  const hintProps = useHintProps();
+  return <button className={`action-button ${['ron', 'tsumo'].includes(action.type) ? 'win-button' : ''} ${action.type === 'pass' ? 'pass-button' : ''}`} aria-label={`${action.label}${action.tiles?.length ? ` ${action.tiles.map(tileName).join(' ')}` : ''}`} {...hintProps(action.description)} onClick={() => onAction(action)}><span>{action.label}</span>{!!action.tiles?.length && <small className="action-tiles">{action.tiles.map((tile, i) => <i key={i}>{tileName(tile)}</i>)}</small>}</button>;
 }
 
 export default function App() {
@@ -132,6 +153,14 @@ export default function App() {
   const [autoPlayMatchDifficulty, setAutoPlayMatchDifficulty] = useState(() => readPrefs().autoPlayMatchDifficulty !== false);
   const [autoExchangeThree, setAutoExchangeThree] = useState(() => readPrefs().autoExchangeThree === true);
   const [themeId, setThemeId] = useState<ThemeId>(() => getTheme(readPrefs().theme).id);
+  const [pixelMode, setPixelMode] = useState(() => readPrefs().pixelMode === true);
+  // The former desktopRivers=true was written even without user input. Do not
+  // interpret that legacy default as a request for the new reading workspace.
+  const [desktopReadView, setDesktopReadView] = useState(() => readPrefs().desktopReadView === true);
+  const [deskMenu, setDeskMenu] = useState(false);
+  const desktopViewport = useDesktopPlaySpace();
+  const desktopSpace = useDesktopRiverSpace();
+  const hintProps = pixelMode ? pixelHint : classicHint;
   const [matchLength, setMatchLength] = useState<NonNullable<SessionOptions['matchLength']>>(() => readPrefs().matchLength ?? 'hanchan');
   const [exchangeThree, setExchangeThree] = useState(() => readPrefs().exchangeThree ?? false);
   const [sichuanOptions, setSichuanOptions] = useState<SichuanOptions>(() => ({ ...normalizeSichuanOptions(readPrefs().sichuan, 2), version: 2 }));
@@ -156,7 +185,7 @@ export default function App() {
   const [quickPreferences, setQuickPreferences] = useState<QuickControls>(() => updateQuickControls({ ...DEFAULT_QUICK_CONTROLS }, readPrefs().quickControls));
   const [handOrder] = useState(createHandOrderController);
   const [, refreshHandOrder] = useState(0);
-  const [showRivers, setShowRivers] = useState(false);
+  const [showRivers, setShowRivers] = useState<boolean | { seat: number }>(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [masterVolume, setMasterVolume] = useState(() => volume(readPrefs().masterVolume, DEFAULT_AUDIO_PREFERENCES.master));
   const [effectsVolume, setEffectsVolume] = useState(() => volume(readPrefs().effectsVolume, DEFAULT_AUDIO_PREFERENCES.effects));
@@ -179,7 +208,7 @@ export default function App() {
   const restoringRef = useRef(false);
   const audioRef = useRef<ReturnType<typeof createTableAudio> | null>(null);
   const logEnd = useRef<HTMLDivElement>(null);
-  const theme = getTheme(themeId);
+  const theme = getTheme(themeId, pixelMode);
   const selectedMode = getMode(modeId);
   const activeMode = getMode(snapshot?.mode ?? modeId);
   const activeDifficulty = DIFFICULTIES.find(item => item.id === (snapshot?.difficulty ?? difficulty)) ?? DIFFICULTIES[1];
@@ -199,6 +228,10 @@ export default function App() {
 
   useEffect(() => () => { flushRecords(); sessionRef.current?.dispose(); }, []);
   useEffect(() => {
+    // Warm the face while the switch is in view, not on every classic startup.
+    if (panel === 'settings' && !pixelMode) void document.fonts.load('16px "Jakukyo Pixel"').catch(() => {});
+  }, [panel, pixelMode]);
+  useEffect(() => {
     const media = window.matchMedia('(orientation: landscape) and (max-height: 500px) and (max-width: 1100px)');
     const closeOnExit = () => { if (!media.matches) setMobileToolsOpen(false); };
     media.addEventListener('change', closeOnExit);
@@ -209,8 +242,8 @@ export default function App() {
     return () => { audio.dispose(); if (audioRef.current === audio) audioRef.current = null; };
   }, []);
   useEffect(() => { audioRef.current?.setPreferences({ sound, bgm, music: musicVolume, master: masterVolume, effects: effectsVolume, ambience: ambienceVolume, theme: themeId }); }, [sound, bgm, musicVolume, masterVolume, effectsVolume, ambienceVolume, themeId]);
-  useEffect(() => { audioRef.current?.sync(snapshot, { reducedMotion, presentation: roundPresentation.phase }); }, [snapshot?.revision, session, reducedMotion, roundPresentation.phase?.id]);
-  const preferenceJson = JSON.stringify({ speed, sound, bgm, musicVolume, autoSort, riichiHints, quickControls: quickPreferences, autoPlayDifficulty, autoPlayMatchDifficulty, autoExchangeThree, masterVolume, effectsVolume, ambienceVolume, winEffects, mode: modeId, difficulty, theme: themeId, matchLength, exchangeThree, sichuan: sichuanOptions });
+  useEffect(() => { audioRef.current?.sync(snapshot, { reducedMotion, presentation: roundPresentation.phase, style:pixelMode?'pixel':'classic' }); }, [snapshot?.revision, session, reducedMotion, pixelMode, roundPresentation.phase?.id]);
+  const preferenceJson = JSON.stringify({ pixelMode, desktopReadView, speed, sound, bgm, musicVolume, autoSort, riichiHints, quickControls: quickPreferences, autoPlayDifficulty, autoPlayMatchDifficulty, autoExchangeThree, masterVolume, effectsVolume, ambienceVolume, winEffects, mode: modeId, difficulty, theme: themeId, matchLength, exchangeThree, sichuan: sichuanOptions });
   useEffect(() => {
     if (restoringRef.current) return;
     try { localStorage.setItem(PREF_KEY, preferenceJson); } catch { /* A private browser can still play. */ }
@@ -419,6 +452,18 @@ export default function App() {
   const ownTurn = !!snapshot?.actions.some(action => action.type === 'discard');
   const discardPrompt = human?.riichi ? '已立直 · 只能摸切' : human?.voidSuit && human.hand.some(tile => tile.tile[0] === human.voidSuit) ? '先打缺门' : '请出牌';
   const inRound = snapshot?.status === 'playing';
+  // Deal/reveal animations, replays and the lobby still use the physical hand.
+  const hasPixelRack = pixelMode && !!inRound && !!displayHand?.length && !roundPresentation.busy;
+  const desktopPlay = pixelMode && desktopViewport && !!inRound;
+  const focusDesk = desktopPlay && !desktopReadView;
+  const riverWings = hasPixelRack && desktopSpace && desktopReadView && snapshot
+    ? { snapshot, theme, selected: highlightedTile, onOpen: (seat: number) => setShowRivers({ seat }) } : null;
+  const tableRivers = desktopPlay && hasPixelRack && !riverWings;
+  const last = focusDesk ? snapshot?.lastDiscard : null;
+  const lastSeat = last && snapshot?.players.find(p => p.id === last.playerId);
+  const lastTile = last && lastSeat ? lastSeat.discards[last.riverIndex] : null;
+  const latestLine = lastSeat && lastTile && !lastTile.called ? `${lastSeat.isHuman ? '你' : lastSeat.name} 打出 ${tileName(lastTile.tile)}` : null;
+  useEffect(() => { if (!desktopPlay) setDeskMenu(false); }, [desktopPlay]);
   const discardAction = ownTurn && inRound && !exchanging ? riichiMode ? 'riichi' : 'discard' : null;
   const nextAction = snapshot?.actions.find(action => action.type === 'next');
   const pendingWinFeedback = !!snapshot?.latestWin && !seenWins.current.has(snapshot.latestWin.id);
@@ -440,61 +485,87 @@ export default function App() {
   }
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (roundPresentation.busy) return;
+      if (roundPresentation.busy || deskMenu || event.defaultPrevented) return;
       if (showRivers) { if (event.key === 'Escape') setShowRivers(false); return; }
       if (mobileToolsOpen) { if (event.key === 'Escape') setMobileToolsOpen(false); return; }
-      if (panel || experiencePanel || unsavedNext || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+      if (panel || experiencePanel || unsavedNext || recoveryBackup || event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
       if (event.key === 'Escape') { setSelectedId(null); setRiichiMode(false); return; }
       if (!ownTurn && !exchanging) return;
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         event.preventDefault(); const index = selectable.findIndex(tile => tile.id === selectedId), direction = event.key === 'ArrowRight' ? 1 : -1;
-        setSelectedId(selectable[index < 0 ? direction > 0 ? 0 : selectable.length - 1 : (index + direction + selectable.length) % selectable.length]?.id ?? null);
+        const next = selectable[index < 0 ? direction > 0 ? 0 : selectable.length - 1 : (index + direction + selectable.length) % selectable.length];
+        setSelectedId(next?.id ?? null);
+        if (hasPixelRack && next) document.getElementById(`pixel-hand-${next.id}`)?.focus();
         clickSound();
       }
       if (event.key === 'Enter' && selectedAction && !(event.target instanceof HTMLButtonElement)) { event.preventDefault(); dispatch(selectedAction); }
     };
     window.addEventListener('keydown', keydown); return () => window.removeEventListener('keydown', keydown);
-  }, [snapshot?.revision, selectedId, riichiMode, panel, experiencePanel, unsavedNext, showRivers, mobileToolsOpen, autoSort, displayHand, roundPresentation.busy]);
+  }, [snapshot?.revision, selectedId, riichiMode, panel, experiencePanel, unsavedNext, recoveryBackup, showRivers, mobileToolsOpen, deskMenu, autoSort, displayHand, hasPixelRack, roundPresentation.busy]);
 
-  return <div className={`app theme-${themeId} ${session ? 'is-playing' : 'is-lobby'}`} style={themeVars} onPointerDownCapture={() => { void audioRef.current?.unlock(); }} onKeyDownCapture={() => { void audioRef.current?.unlock(); }}>
+  const liveTableFeedback=!reducedMotion && !panel && !experiencePanel && !showRivers && !deskMenu && !mobileToolsOpen && !unsavedNext && !recoveryBackup && !celebration && !feedbackEvent;
+  return <GameHints.Provider value={hintProps}><div className={`app theme-${themeId} ${session ? 'is-playing' : 'is-lobby'}${pixelMode ? ' pixel-mode' : ''}${desktopPlay ? ' desk-play' : ''}${focusDesk ? ' desk-focus' : ''}`} style={themeVars} onPointerDownCapture={() => { void audioRef.current?.unlock(); }} onKeyDownCapture={() => { void audioRef.current?.unlock(); }}>
     <header className="topbar">
-      <button className="brand" onClick={leaveTable} aria-label="雀境 返回大厅"><span className="brand-seal">雀</span><div><span className="brand-name">雀 境</span></div></button>
+      <button className="brand" onClick={leaveTable} aria-label="雀境 返回大厅"><span className="brand-seal" aria-hidden="true">{pixelMode ? <TilePortrait tile="s1" theme={theme} /> : '雀'}</span><div><span className="brand-name">雀 境</span>{pixelMode && <span className="pixel-wordmark" aria-hidden="true">JAKUKYO PIXEL</span>}</div></button>
       <div className="game-heading"><span className="small-dot" /><span>{session ? activeMode.name : '自在一桌，各有章法'}</span>{session && <><span className="heading-divider" /><span className="muted">{activeDifficulty.label} AI</span></>}</div>
-      <button type="button" className="icon-button mobile-tools-toggle" aria-label="牌桌工具" aria-expanded={mobileToolsOpen} aria-controls="table-tools" onClick={() => setMobileToolsOpen(!mobileToolsOpen)}><Icon name="menu" /></button>
+      {desktopPlay && snapshot ? <nav className="header-actions desk-navigation" aria-label="游戏工具">
+        <button type="button" className="desk-nav-button" role="switch" aria-label="读牌视图" aria-checked={desktopReadView}
+          {...hintProps(desktopReadView ? '收起读牌信息，回到简洁牌桌' : '展开牌河与听牌分析')} onClick={() => setDesktopReadView(!desktopReadView)}>
+          <Icon name="river" size={16}/>{desktopReadView ? '收起读牌' : '读牌'}</button>
+        {desktopReadView && !desktopSpace && <button type="button" className="desk-nav-button" aria-haspopup="dialog" onClick={() => setShowRivers(true)}>牌河全览</button>}
+        <DesktopPlayMenu open={deskMenu} onOpen={setDeskMenu} primary={[
+          { label:'理牌', run:sortHand, disabled:!displayHand?.length || roundPresentation.busy },
+          { label:'切换视角', ariaLabel:view === 'overhead' ? '切换透视视角' : '切换俯视视角', run:() => setView(view === 'overhead' ? 'perspective' : 'overhead') },
+          { label:snapshot.autoPlay ? '接管对局' : '开启托管', run:() => session?.setAutoPlay(!snapshot.autoPlay) },
+          { label:'牌河全览', run:() => setShowRivers(true) },
+          { label:'游戏设置', run:() => setPanel('settings') },
+          { label:'保存并返回大厅', run:leaveTable },
+        ]} more={[
+          { label:'对局记录', run:() => setPanel('log') }, { label:'规则', run:() => setPanel('rules') },
+          { label:'保存并查看牌谱', run:() => openExperience('library') }, { label:'本地战绩', run:() => openExperience('stats') },
+          { label:'新手帮助', run:() => openExperience('help') }, { label:'牌桌主题', run:() => setPanel('themes') },
+        ]} />
+      </nav> : <><button type="button" className="icon-button mobile-tools-toggle" aria-label="牌桌工具" aria-expanded={mobileToolsOpen} aria-controls="table-tools" onClick={() => setMobileToolsOpen(!mobileToolsOpen)}><Icon name="menu" /></button>
       <nav className="header-actions" aria-label="游戏工具">
         {snapshot && <button type="button" className="text-button river-open-button" aria-label="牌河全览" aria-haspopup="dialog" onClick={() => { setMobileToolsOpen(false); setShowRivers(true); }}><Icon name="river" size={18} /><span>牌河</span></button>}
-        <button className="text-button experience-nav" onClick={() => openExperience('library')} aria-label={session ? "保存并查看牌谱" : "牌谱库"} title={session ? "保存当前对局并查看牌谱" : "本地牌谱与回放"}><Icon name="log" /><span>{session ? "保存看谱" : "牌谱"}</span></button><button className="text-button experience-nav" onClick={() => openExperience('stats')} aria-label="本地战绩" title="本地战绩"><Icon name="chart" /><span>战绩</span></button><button className="text-button experience-nav" onClick={() => openExperience('help')} aria-label="新手帮助" title="新手帮助"><Icon name="help" /><span>帮助</span></button>{session && <button className="icon-button" onClick={leaveTable} aria-label="保存并返回大厅" title="保存并返回大厅"><Icon name="home" /></button>}<button className="text-button" onClick={() => setPanel('rules')}><Icon name="book" /><span>规则</span></button><button className="icon-button" onClick={() => setPanel('themes')} aria-label="选择牌桌主题" title="牌桌主题"><Icon name="palette" /></button><button className="icon-button" onClick={() => setPanel('settings')} aria-label="游戏设置"><Icon name="settings" /></button></nav>
+        <button className="text-button experience-nav" onClick={() => openExperience('library')} aria-label={session ? "保存并查看牌谱" : "牌谱库"} {...hintProps(session ? "保存当前对局并查看牌谱" : "本地牌谱与回放")}><Icon name="log" /><span>{session ? "保存看谱" : "牌谱"}</span></button><button className="text-button experience-nav" onClick={() => openExperience('stats')} aria-label="本地战绩" {...hintProps("本地战绩")}><Icon name="chart" /><span>战绩</span></button><button className="text-button experience-nav" onClick={() => openExperience('help')} aria-label="新手帮助" {...hintProps("新手帮助")}><Icon name="help" /><span>帮助</span></button>{session && <button className="icon-button" onClick={leaveTable} aria-label="保存并返回大厅" {...hintProps("保存并返回大厅")}><Icon name="home" /></button>}<button className="text-button" onClick={() => setPanel('rules')}><Icon name="book" /><span>规则</span></button><button className="icon-button" onClick={() => setPanel('themes')} aria-label="选择牌桌主题" {...hintProps("牌桌主题")}><Icon name="palette" /></button><button className="icon-button" onClick={() => setPanel('settings')} aria-label="游戏设置"><Icon name="settings" /></button></nav>
+      </>}
     </header>
     {mobileToolsOpen && <button type="button" className="mobile-tools-backdrop" aria-label="关闭牌桌工具" onClick={() => setMobileToolsOpen(false)} />}
 
-    <main className="game-shell">
-      <div className="table-area" aria-label="3D 麻将牌桌">
-        {experiencePanel !== 'library' && <SceneBoundary><MahjongTable snapshot={snapshot} sessionIdentity={session} roundPresentation={roundPresentation.phase} revealedHands={roundPresentation.revealedHands} displayHand={displayHand} selectedId={selectedId} highlightedTile={highlightedTile} selectedIds={snapshot?.setupSelection} interactiveIds={roundPresentation.busy || showRivers ? [] : selectable.map(tile => tile.id)} onSelect={selectTile} onTileDiscard={discardTile} discardAction={discardAction} discardIntent={discardIntent} view={view} theme={theme} celebration={reducedMotion || roundPresentation.phase?.kind === 'reveal' ? null : celebration} reducedMotion={reducedMotion} previewPlayerCount={selectedMode.players} onFailure={() => setWebglFailed(true)} onRestore={() => setWebglFailed(false)} /></SceneBoundary>}
+    <TableActionNotes session={session} snapshot={snapshot} callsOnTable={!webglFailed} stage={liveTableFeedback
+      ? hasPixelRack ? (riverWings ? 'wings' : tableRivers ? 'field' : 'rack') : !pixelMode && inRound && desktopViewport && !roundPresentation.busy ? 'classic' : null : null}><main className="game-shell">
+      <div className={riverWings ? 'table-workspace has-desk-rivers' : 'table-workspace'}>
+      {riverWings && <DesktopRiverWing key="left" edge="left" {...riverWings} />}
+      <div className={hasPixelRack ? 'table-area pixel-rack-table' : 'table-area'} aria-label={pixelMode ? '像素麻将牌桌' : '3D 麻将牌桌'}>
+        {experiencePanel !== 'library' && <SceneBoundary><MahjongTable snapshot={snapshot} showMeldCalls={liveTableFeedback && !webglFailed} sessionIdentity={session} roundPresentation={roundPresentation.phase} revealedHands={roundPresentation.revealedHands} displayHand={displayHand} externalHand={hasPixelRack} screenRivers={tableRivers} selectedId={selectedId} highlightedTile={highlightedTile} selectedIds={snapshot?.setupSelection} interactiveIds={roundPresentation.busy || showRivers ? [] : selectable.map(tile => tile.id)} onSelect={selectTile} onTileDiscard={discardTile} discardAction={discardAction} discardIntent={discardIntent} view={view} theme={theme} celebration={reducedMotion || roundPresentation.phase?.kind === 'reveal' ? null : celebration} reducedMotion={reducedMotion} previewPlayerCount={selectedMode.players} onFailure={() => setWebglFailed(true)} onRestore={() => setWebglFailed(false)} /></SceneBoundary>}
         <div className="table-vignette" />
-        <div id="table-tools" className={`table-tools ${mobileToolsOpen ? 'mobile-open' : ''}`} onClick={event => { if (event.target instanceof Element && event.target.closest('button')) setMobileToolsOpen(false); }} onChange={event => { if (event.target instanceof HTMLSelectElement) setMobileToolsOpen(false); }}>
+        {tableRivers && snapshot && <TableRiverField snapshot={snapshot} theme={theme} selected={highlightedTile} onOpen={seat => setShowRivers({ seat })} />}
+        {!desktopPlay && <div id="table-tools" className={`table-tools ${mobileToolsOpen ? 'mobile-open' : ''}`} onClick={event => { if (event.target instanceof Element && event.target.closest('button')) setMobileToolsOpen(false); }} onChange={event => { if (event.target instanceof HTMLSelectElement) setMobileToolsOpen(false); }}>
           {snapshot && <>
             {exchangeThreeEnabled && <label className="exchange-policy-quick"><span>换牌</span><ExchangePolicySelect ariaLabel="换三张托管方式" value={activeAutoExchangeThree} onChange={changeAutoExchangeThree} /></label>}
-            <button className={`sort-hand-button assist-quick ${riichiHints ? 'is-on' : ''}`} role="switch" aria-checked={riichiHints} aria-label="听牌辅助" title="显示听张与向听" onClick={() => setRiichiHints(!riichiHints)}><i />听牌辅助</button>
+            <button className={`sort-hand-button assist-quick ${riichiHints ? 'is-on' : ''}`} role="switch" aria-checked={riichiHints} aria-label="听牌辅助" {...hintProps("显示听张与向听")} onClick={() => setRiichiHints(!riichiHints)}><i />听牌辅助</button>
             <button className={`sort-hand-button auto-sort-quick ${autoSort ? 'is-on' : ''}`} role="switch" aria-checked={autoSort} aria-label="自动理牌" onClick={() => setAutoSort(!autoSort)}><i />自动理牌</button>
-            <button className="sort-hand-button" onClick={sortHand} disabled={!displayHand?.length} title="按万、筒、条、字牌整理，摸入牌保持最右"><Icon name="sort" size={16} />理牌</button>
+            <button className="sort-hand-button" onClick={sortHand} disabled={!displayHand?.length} {...hintProps("按万、筒、条、字牌整理，摸入牌保持最右")}><Icon name="sort" size={16} />理牌</button>
           </>}
-          <button className={`icon-button ${view === 'overhead' ? 'active' : ''}`} aria-label={view === 'overhead' ? '切换透视视角' : '切换俯视视角'} title="切换视角" onClick={() => setView(view === 'perspective' ? 'overhead' : 'perspective')}><Icon name="view" /><span className="table-tool-label">切换视角</span></button>
+          <button className={`icon-button ${view === 'overhead' ? 'active' : ''}`} aria-label={view === 'overhead' ? '切换透视视角' : '切换俯视视角'} {...hintProps("切换视角")} onClick={() => setView(view === 'perspective' ? 'overhead' : 'perspective')}><Icon name="view" /><span className="table-tool-label">切换视角</span></button>
           <button className="icon-button" aria-label={sound ? '关闭全部声音' : '打开全部声音'} onClick={() => setSound(!sound)}><Icon name={sound ? 'sound' : 'mute'} /><span className="table-tool-label">{sound ? '关闭声音' : '打开声音'}</span></button>
           {snapshot && <button className="icon-button" aria-label="查看对局记录" onClick={() => setPanel(panel === 'log' ? null : 'log')}><Icon name="log" /><span className="table-tool-label">对局记录</span></button>}
-        </div>
+        </div>}
         {snapshot && <>
           <div className="round-chip"><span>{snapshot.round.wind}{snapshot.round.hand}局</span>{isJapanese && <><i /><span>{snapshot.round.honba} 本场</span></>}<i /><span className="muted">余牌 <b>{snapshot.round.tilesLeft}</b></span></div>
-          <div className="dora-chip">{snapshot.round.doraIndicators.length > 0 && <><span className="eyebrow">宝牌指示牌</span><div>{snapshot.round.doraIndicators.map((tile, i) => <span className={`mini-tile suit-${tile[0]}`} key={i} title={tileName(tile)}>{tileName(tile)}</span>)}</div></>}{snapshot.round.wildcard && <div className="wildcard-chip"><span>百搭</span><b className="mini-tile">{tileName(snapshot.round.wildcard)}</b></div>}</div>
-          {snapshot.players.filter(player => !player.isHuman).map(player => <div key={player.id} className={`seat seat-${tableSeat(player.id, snapshot.players.length)} ${snapshot.turn === player.id && inRound ? 'seat-active' : ''} ${player.hasWon ? 'seat-won' : ''}`}>
-            <div className="seat-avatar">{player.wind}</div><div className="seat-info"><div className="seat-name">{player.name}<span>{activeDifficulty.label}</span></div><div className="seat-points">{format(player.points)}<small>{unit}</small></div><button className={`river-page-note ${riverLayout(player.discards).pages > 1 ? 'is-paged' : ''}`} onClick={() => setShowRivers(true)} title="查看完整牌河">牌河 {riverLayout(player.discards).count} 张{riverLayout(player.discards).pages > 1 ? ` · 第${riverLayout(player.discards).page}页` : ''}</button><div className="seat-bonuses">{player.voidSuit && <span>缺{ suitLabel(player.voidSuit) }</span>}{!!player.kita && <span>拔北 ×{player.kita}</span>}{!!player.flowers?.length && <span>花 ×{player.flowers.length}</span>}{player.hasWon && <span>已和{player.winCount && player.winCount > 1 ? ` ×${player.winCount}` : ''}</span>}</div></div>{player.riichi ? <span className="riichi-badge">立直</span> : snapshot.turn === player.id && inRound ? <span className="thinking-dots"><i /><i /><i /></span> : null}<SeatFlowers flowers={player.flowers} name={player.name} theme={theme} />
+          <div className="dora-chip">{snapshot.round.doraIndicators.length > 0 && <><span className="eyebrow">宝牌指示牌</span><div>{snapshot.round.doraIndicators.map((tile, i) => pixelMode ? <TilePortrait key={i} tile={tile} theme={theme} /> : <span className={`mini-tile suit-${tile[0]}`} key={i} {...hintProps(tileName(tile))}>{tileName(tile)}</span>)}</div></>}{snapshot.round.wildcard && <div className="wildcard-chip"><span>百搭</span>{pixelMode ? <TilePortrait tile={snapshot.round.wildcard} theme={theme} /> : <b className="mini-tile">{tileName(snapshot.round.wildcard)}</b>}</div>}</div>
+          {!riverWings && !tableRivers && snapshot.players.filter(player => !player.isHuman).map(player => <div key={player.id} className={`seat seat-${tableSeat(player.id, snapshot.players.length)} ${snapshot.turn === player.id && inRound ? 'seat-active' : ''} ${player.hasWon ? 'seat-won' : ''}`}>
+            <div className="seat-avatar">{player.wind}{!pixelMode && <ClassicDeclaration seat={player.id} />}</div><div className="seat-info"><div className="seat-name">{player.name}<span>{activeDifficulty.label}</span></div><div className="seat-points">{format(player.points)}<small>{unit}</small></div><button className={`river-page-note ${riverLayout(player.discards).pages > 1 ? 'is-paged' : ''}`} onClick={() => setShowRivers(true)} {...hintProps("查看完整牌河")}>牌河 {riverLayout(player.discards).count} 张{riverLayout(player.discards).pages > 1 ? ` · 第${riverLayout(player.discards).page}页` : ''}</button><div className="seat-bonuses">{player.voidSuit && <span>缺{ suitLabel(player.voidSuit) }</span>}{!!player.kita && <span>拔北 ×{player.kita}</span>}{!!player.flowers?.length && <span>花 ×{player.flowers.length}</span>}{player.hasWon && <span>已和{player.winCount && player.winCount > 1 ? ` ×${player.winCount}` : ''}</span>}</div></div>{player.riichi ? <span className="riichi-badge">立直</span> : snapshot.turn === player.id && inRound ? <span className="thinking-dots"><i /><i /><i /></span> : null}<SeatFlowers flowers={player.flowers} name={player.name} theme={theme} />
           </div>)}
           <div className={`table-caption ${highlightedTile ? 'river-selection-count' : ''}`} role={highlightedTile ? 'status' : undefined}>{highlightedTile ? <><strong>{tileName(selectedTile?.tile ?? highlightedTile)}</strong><span>牌河 {riverMatches.inRiverCount} · 副露 {riverMatches.inMeldCount}</span></> : <>{theme.name} · {activeMode.name}</>}</div>
         </>}
         {!snapshot && <div className="lobby-overlay"><div className="lobby-card lobby-config">
+          {pixelMode && <div className="pixel-kicker"><i aria-hidden="true" />像素牌桌 <span>/</span> PIXEL EDITION</div>}
           <h1>好牌，<em>慢慢打。</em></h1>
           <div className="config-label"><span>选择玩法</span><small>{MODES.filter(mode => mode.status === 'playable').length} 种已开放</small></div>
           <div className="family-tabs" role="group" aria-label="玩法分类">{['全部', '日本', '竞技', '四川', '华南', '地方'].map(item => <button key={item} aria-pressed={family === item} className={family === item ? 'active' : ''} onClick={() => setFamily(item)}>{item}</button>)}</div>
-          <div className="mode-grid" role="group" aria-label="麻将玩法">{MODES.filter(mode => family === '全部' || mode.family === family).map(mode => <button key={mode.id} disabled={mode.status !== 'playable'} className={`mode-card ${modeId === mode.id ? 'selected' : ''}`} aria-pressed={modeId === mode.id} onClick={() => setModeId(mode.id)} title={`${mode.description} · ${mode.ruleVersion}`}><span className="mode-mark">{mode.shortName.slice(0, 1)}</span><span><strong>{mode.name}</strong><small>{mode.status === 'playable' ? `${mode.players} 人 · ${mode.handSize} 张` : '制作中'}</small></span>{modeId === mode.id && <i />}</button>)}</div>
+          <div className="mode-grid" role="group" aria-label="麻将玩法">{MODES.filter(mode => family === '全部' || mode.family === family).map(mode => <button key={mode.id} disabled={mode.status !== 'playable'} className={`mode-card ${modeId === mode.id ? 'selected' : ''}`} aria-pressed={modeId === mode.id} onClick={() => setModeId(mode.id)} {...hintProps(`${mode.description} · ${mode.ruleVersion}`)}><span className="mode-mark">{mode.shortName.slice(0, 1)}</span><span><strong>{mode.name}</strong><small>{mode.status === 'playable' ? `${mode.players} 人 · ${mode.handSize} 张` : '制作中'}</small></span>{modeId === mode.id && <i />}</button>)}</div>
           <p className="mode-description">{selectedMode.description}</p>
           <div className="config-label"><span>电脑难度</span></div>
           <div className="difficulty-options" role="group" aria-label="电脑难度">{DIFFICULTIES.map((item, index) => <button key={item.id} aria-pressed={difficulty === item.id} className={difficulty === item.id ? 'selected' : ''} onClick={() => setDifficulty(item.id)}><span>{item.label}</span></button>)}</div>
@@ -506,37 +577,55 @@ export default function App() {
           {saved && <button className="resume-button" onClick={() => startGame(true)}>继续上次对局 <span>{getMode(saved.mode ?? 'riichi').name} · 自动存档</span></button>}</div>
         </div><div className="lobby-stamp"><span>{theme.name.slice(0, 1)}</span><span>{theme.name.slice(1, 2)}</span></div></div>}
         {webglFailed && <div className="webgl-notice">3D 图形连接已中断，请刷新页面恢复存档。</div>}
-        <DiscardFeedback snapshot={snapshot} sessionKey={session} theme={theme} reducedMotion={reducedMotion} />
-        {snapshot && <RiichiAssistPanel snapshot={snapshot} selectedTile={selectedTile} riichiMode={riichiMode} theme={theme} showDetails={riichiHints} />}
-        {snapshot && <RegionalAssistPanel snapshot={snapshot} session={session} selectedTile={selectedTile} notice={ronNotice} theme={theme} showDetails={riichiHints} />}
+        {!focusDesk && <DiscardFeedback snapshot={snapshot} sessionKey={session} theme={theme} reducedMotion={reducedMotion} />}
+        {snapshot && !focusDesk && <RiichiAssistPanel snapshot={snapshot} selectedTile={selectedTile} riichiMode={riichiMode} theme={theme} showDetails={riichiHints} />}
+        {snapshot && (!focusDesk || !!snapshot.selfWinNotice) && <RegionalAssistPanel snapshot={snapshot} session={session} selectedTile={selectedTile} notice={ronNotice} theme={theme} showDetails={!focusDesk && riichiHints} />}
+      </div>
+      {riverWings && <DesktopRiverWing key="right" edge="right" {...riverWings} />}
       </div>
 
+      {hasPixelRack && snapshot && displayHand && <PixelHandRack hand={displayHand} selectable={selectable} selectedId={selectedId}
+        exchangeIds={exchanging ? snapshot.setupSelection ?? [] : undefined} scope={riverSelectionScope(snapshot)} theme={theme}
+        blocked={!!(panel || experiencePanel || showRivers || mobileToolsOpen || deskMenu || unsavedNext || recoveryBackup)}
+        action={discardAction} onSelect={selectTile} onHighlight={id => { setSelectedId(id); clickSound(); }} onDrop={discardTile} />}
       {snapshot ? <section className={`play-dock ${hasResponseFeedback ? 'has-response-feedback' : ''}`} aria-label="我的手牌与操作" inert={roundPresentation.busy}>
-        <div className="my-seat"><span className="my-avatar">{human?.wind ?? '东'}</span><div><div className="my-name">你 <span>{human?.dealer ? '庄家' : '玩家'}</span>{human?.riichi && <b>立直</b>}{human?.voidSuit && <b>缺{suitLabel(human.voidSuit)}</b>}{human?.hasWon && <b>已和</b>}</div><strong>{format(human?.points ?? 0)}<small>{unit}</small></strong><div className="my-bonuses">{!!human?.flowers?.length && `花 ×${human.flowers.length} `}{!!human?.kita && `拔北 ×${human.kita}`}</div></div><SeatFlowers flowers={human?.flowers} name="你" theme={theme} own /></div>
-        <div className="turn-prompt" aria-live="polite">{hasResponseFeedback ? <ResponseFeedback winAction={winActions[0]} notice={ronNotice} players={snapshot.players} onHelp={() => isJapanese ? openExperience('help', 'yaku') : setPanel('rules')} helpLabel={isJapanese ? '查看常见役' : '查看本桌规则'} /> : <><div className="prompt-title"><span className={`status-dot ${ownTurn || exchanging ? 'your-turn' : ''}`} />{riichiMode ? '选择立直宣言牌' : exchanging ? snapshot.autoPlay && !activeAutoExchangeThree ? '确认换三张后继续托管' : '换三张' : ownTurn ? discardPrompt : snapshot.phase === 'response' ? '请选择操作' : displayScoringText(snapshot.message, snapshot.mode, scoringPlayers)}</div><>{exchanging && <div className="prompt-detail">同花色 · 已选 {snapshot.setupSelection?.length ?? 0}/3</div>}</></>}{inRound && <QuickControlButtons value={snapshot.quickControls ?? quickPreferences} onChange={changeQuickControls} />}</div>
+        <div className="my-seat"><span className="my-avatar">{human?.wind ?? '东'}{!pixelMode && <ClassicDeclaration seat={snapshot.humanId} />}</span><div><div className="my-name">你 <span>{human?.dealer ? '庄家' : '玩家'}</span>{human?.riichi && <b>立直</b>}{human?.voidSuit && <b>缺{suitLabel(human.voidSuit)}</b>}{human?.hasWon && <b>已和</b>}</div><strong>{format(human?.points ?? 0)}<small>{unit}</small></strong><div className="my-bonuses">{!!human?.flowers?.length && `花 ×${human.flowers.length} `}{!!human?.kita && `拔北 ×${human.kita}`}</div></div><SeatFlowers flowers={human?.flowers} name="你" theme={theme} own /></div>
+        <div className="turn-prompt" aria-live="polite">
+          {hasResponseFeedback ? <ResponseFeedback winAction={winActions[0]} notice={ronNotice} players={snapshot.players} onHelp={() => isJapanese ? openExperience('help', 'yaku') : setPanel('rules')} helpLabel={isJapanese ? '查看常见役' : '查看本桌规则'} /> : <>
+            <div className="prompt-title"><span className={`status-dot ${ownTurn || exchanging ? 'your-turn' : ''}`} />{riichiMode ? '选择立直宣言牌' : exchanging ? snapshot.autoPlay && !activeAutoExchangeThree ? '确认换三张后继续托管' : '换三张' : ownTurn ? discardPrompt : snapshot.phase === 'response' ? '请选择操作' : displayScoringText(snapshot.message, snapshot.mode, scoringPlayers)}
+              {focusDesk && snapshot.riichiAssist?.furiten.active && <span className="desk-furiten">振听</span>}
+            </div>
+            {exchanging && <div className="prompt-detail">同花色 · 已选 {snapshot.setupSelection?.length ?? 0}/3</div>}
+            {latestLine && <div className="desk-latest">上一打 · {latestLine}</div>}
+          </>}
+          {inRound && <QuickControlButtons value={snapshot.quickControls ?? quickPreferences} onChange={changeQuickControls} activeOnly={desktopPlay} />}
+        </div>
         <div className="response-actions">{winActions.length > 0 && <div className="win-actions" aria-label="和牌操作">{winActions.map(action => <LegalActionButton key={action.id} action={action} onAction={dispatch} />)}</div>}<div className="game-actions">{specialActions.map(action => <LegalActionButton key={action.id} action={action} onAction={dispatch} />)}
           {canRiichi && <button className={`action-button riichi-action ${riichiMode ? 'is-armed' : ''}`} onClick={() => { setRiichiMode(!riichiMode); setSelectedId(null); }}>{riichiMode ? '取消立直' : '立直'}</button>}
           {ownTurn && <button className="primary-button discard-button" disabled={!selectedAction} onClick={() => selectedAction && dispatch(selectedAction)}>{riichiMode ? '立直 · ' : ''}{selectedTile ? `打出 ${selectedTile.label || tileName(selectedTile.tile)}` : '选一张牌'}<Icon name="arrow" /></button>}
-          {!ownTurn && !exchanging && specialActions.length === 0 && winActions.length === 0 && inRound && <span className="waiting-label"><span className="thinking-dots"><i /><i /><i /></span>{snapshot.autoPlay ? '托管中' : '等待出牌'}</span>}
+          {!desktopPlay && !ownTurn && !exchanging && specialActions.length === 0 && winActions.length === 0 && inRound && <span className="waiting-label"><span className="thinking-dots"><i /><i /><i /></span>{snapshot.autoPlay ? '托管中' : '等待出牌'}</span>}
         </div></div>
-        <div className="auto-control"><button className={`icon-button ${snapshot.autoPlay ? 'active' : ''}`} title={snapshot.autoPlay ? '关闭托管' : '开启托管'} aria-label={snapshot.autoPlay ? '接管对局' : '开启托管'} aria-pressed={snapshot.autoPlay} onClick={() => session?.setAutoPlay(!snapshot.autoPlay)}><Icon name="bot" /></button><span>{snapshot.autoPlay ? '接管' : '托管'}</span><label className="auto-difficulty-control" title="托管等级"><AutoPlayDifficultySelect ariaLabel="托管等级" value={autoPlayDifficultyValue} onChange={changeAutoPlayDifficulty} tableDifficulty={activeDifficulty.label} /></label></div>
-        <div className="accessible-hand" aria-label="可选手牌">{selectable.map(tile => <button key={tile.id} onFocus={() => setSelectedId(tile.id)} onClick={() => selectTile(tile)} aria-label={`选择${tile.label || tileName(tile.tile)}${tile.drawn ? '，摸入牌' : ''}`}>{tile.label || tileName(tile.tile)}</button>)}</div>
+        {desktopPlay ? snapshot.autoPlay && <button type="button" className="desk-takeover" aria-label="接管对局" onClick={() => session?.setAutoPlay(false)}>托管中 · 接管</button> :
+          <div className="auto-control"><button className={`icon-button ${snapshot.autoPlay ? 'active' : ''}`} {...hintProps(snapshot.autoPlay ? '关闭托管' : '开启托管')} aria-label={snapshot.autoPlay ? '接管对局' : '开启托管'} aria-pressed={snapshot.autoPlay} onClick={() => session?.setAutoPlay(!snapshot.autoPlay)}><Icon name="bot" /></button><span>{snapshot.autoPlay ? '接管' : '托管'}</span><label className="auto-difficulty-control" {...hintProps("托管等级")}><AutoPlayDifficultySelect ariaLabel="托管等级" value={autoPlayDifficultyValue} onChange={changeAutoPlayDifficulty} tableDifficulty={activeDifficulty.label} /></label></div>}
+        {!hasPixelRack && <div className="accessible-hand" aria-label="可选手牌">{selectable.map(tile => <button key={tile.id} onFocus={() => setSelectedId(tile.id)} onClick={() => selectTile(tile)} aria-label={`选择${tile.label || tileName(tile.tile)}${tile.drawn ? '，摸入牌' : ''}`}>{tile.label || tileName(tile.tile)}</button>)}</div>}
       </section> : null}
-    </main>
+    </main></TableActionNotes>
 
     {snapshot?.result && roundPresentation.settlementReady && !roundPresentation.busy && !celebration && !feedbackEvent && !pendingWinFeedback && (snapshot.status === 'roundEnd' || snapshot.status === 'matchEnd') && <RoundSettlement snapshot={snapshot} theme={theme} reducedMotion={reducedMotion || !winEffects} onNext={() => nextAction && dispatch(nextAction)} onRestart={() => startGame()} onLobby={leaveTable} onExport={exportReplay} />}
 
     {panel && <div className={`jakukyo-overlay ${panel === 'log' ? 'jakukyo-drawer-overlay' : ''}`} onClick={() => setPanel(null)}><section className={`panel ${panel === 'log' ? 'log-panel' : ''}`} onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={panel === 'rules' ? '麻将规则' : panel === 'settings' ? '游戏设置' : panel === 'themes' ? '牌桌主题' : '对局记录'}><button className="icon-button panel-close" aria-label="关闭面板" onClick={() => setPanel(null)}><Icon name="close" /></button><h2>{panel === 'rules' ? '这一桌的规则' : panel === 'settings' ? '按你的节奏' : panel === 'themes' ? '换一桌风景' : '对局记录'}</h2>
-      {panel === 'themes' ? <><ThemePicker value={themeId} onChange={setThemeId} /></> : panel === 'rules' ? <><p className="panel-intro">{activeMode.name} · {activeRuleVersion}</p><div className="rules-grid"><div><strong>{activeMode.players} 人</strong><span>{activeMode.handSize} 张基础手牌</span></div>{activeMode.features.map(feature => <div key={feature}><strong>{feature}</strong></div>)}</div><ul className="rule-notes">{ruleNotes.map(rule => <li key={rule}>{rule}</li>)}</ul></> : panel === 'settings' ? <><label className="setting-row"><span><strong>托管等级</strong></span><AutoPlayDifficultySelect ariaLabel="设置托管等级" value={autoPlayDifficultyValue} onChange={changeAutoPlayDifficulty} tableDifficulty={activeDifficulty.label} /></label>{exchangeThreeEnabled && <label className="setting-row"><span><strong>托管时换三张</strong></span><ExchangePolicySelect ariaLabel="设置换三张托管方式" value={activeAutoExchangeThree} onChange={changeAutoExchangeThree} /></label>}<div className="setting-row"><span><strong>快捷操作</strong></span><QuickControlButtons value={snapshot?.quickControls ?? quickPreferences} onChange={changeQuickControls} settings /></div><div className="setting-row"><span><strong>听牌辅助</strong></span><button className={`switch ${riichiHints ? 'on' : ''}`} role="switch" aria-checked={riichiHints} aria-label="设置听牌辅助" onClick={() => setRiichiHints(!riichiHints)}><span /></button></div><div className="setting-row auto-sort-setting"><span><strong>自动理牌</strong></span><button className={`switch ${autoSort ? 'on' : ''}`} role="switch" aria-checked={autoSort} aria-label="设置自动理牌" onClick={() => setAutoSort(!autoSort)}><span /></button></div><label className="setting-row"><span><strong>电脑出牌节奏</strong></span><select aria-label="电脑出牌节奏" value={speed} onChange={event => setSpeed(Number(event.target.value))}><option value="250">利落 · 0.25 秒</option><option value="650">舒适 · 0.65 秒</option><option value="1100">从容 · 1.1 秒</option></select></label><label className="setting-row"><span><strong>声音总开关</strong></span><button className={`switch ${sound ? 'on' : ''}`} role="switch" aria-checked={sound} aria-label="声音总开关" onClick={() => setSound(!sound)}><span /></button></label><div className="audio-controls"><VolumeSlider label="总音量" value={masterVolume} onChange={setMasterVolume} disabled={!sound} /><VolumeSlider label="动作音量" value={effectsVolume} onChange={setEffectsVolume} disabled={!sound} /><VolumeSlider label="环境音量" value={ambienceVolume} onChange={setAmbienceVolume} disabled={!sound} /><div className="audio-controls-footer"><button className="effect-preview-button" disabled={!sound || masterVolume === 0 || effectsVolume === 0} onClick={() => audioRef.current?.preview()}>试听牌声</button></div></div><div className="setting-row bgm-setting"><span><strong>背景音乐</strong></span><button className={`switch ${bgm ? 'on' : ''}`} role="switch" aria-checked={bgm} aria-label="背景音乐" onClick={() => setBgm(!bgm)}><span /></button></div><div className="music-volume"><VolumeSlider label="音乐音量" value={musicVolume} onChange={setMusicVolume} disabled={!sound || !bgm} /></div><div className="setting-row"><span><strong>和牌特效</strong></span><div className="effect-setting-actions"><button className="effect-preview-button" disabled={!winEffects} onClick={() => { audioRef.current?.previewWin('yakuman'); setPanel(null); setCelebration({ id: `preview-${Date.now()}`, tier: 3, title: '役 满', subtitle: '', playerName: '你', preview: true }); }}>预览特效</button><button className={`switch ${winEffects ? 'on' : ''}`} role="switch" aria-checked={winEffects} aria-label="和牌特效" onClick={() => { setWinEffects(!winEffects); if (winEffects) setCelebration(null); }}><span /></button></div></div><div className="settings-theme"><strong>牌桌主题</strong><ThemePicker value={themeId} onChange={setThemeId} /></div><DataBackupControls prepareExport={prepareBackup} onRestored={finishDataRestore} onRecoveryRequired={requireDataRecovery} /><label className="seed-field"><strong>下一场的随机种子</strong><input value={seed} onChange={event => setSeed(event.target.value)} placeholder="留空使用新牌山" maxLength={80} /></label>{session && <div className="settings-bottom"><button className="text-button" onClick={exportReplay}><Icon name="download" />导出牌谱</button><button className="text-button" onClick={leaveTable}><Icon name="home" />保存并返回大厅</button></div>}</> : <><p className="panel-intro">{activeMode.name} · {activeDifficulty.label}<br />种子 <code>{snapshot?.seed ?? '—'}</code></p><div className="log-list">{snapshot?.log.map(entry => <div key={entry.id}><span>{String(entry.id).padStart(3, '0')}</span><p>{displayScoringText(entry.text, snapshot?.mode, scoringPlayers)}</p></div>)}<div ref={logEnd} /></div><button className="text-button" onClick={exportReplay}><Icon name="download" />导出牌谱</button></>}
+      {panel === 'settings' && <PixelModeSwitch active={pixelMode} themeId={themeId} onToggle={() => setPixelMode(on => !on)} />}
+      {panel === 'themes' ? <><ThemePicker value={themeId} pixel={pixelMode} onChange={setThemeId} /></> : panel === 'rules' ? <><p className="panel-intro">{activeMode.name} · {activeRuleVersion}</p><div className="rules-grid"><div><strong>{activeMode.players} 人</strong><span>{activeMode.handSize} 张基础手牌</span></div>{activeMode.features.map(feature => <div key={feature}><strong>{feature}</strong></div>)}</div><ul className="rule-notes">{ruleNotes.map(rule => <li key={rule}>{rule}</li>)}</ul></> : panel === 'settings' ? <><label className="setting-row"><span><strong>托管等级</strong></span><AutoPlayDifficultySelect ariaLabel="设置托管等级" value={autoPlayDifficultyValue} onChange={changeAutoPlayDifficulty} tableDifficulty={activeDifficulty.label} /></label>{exchangeThreeEnabled && <label className="setting-row"><span><strong>托管时换三张</strong></span><ExchangePolicySelect ariaLabel="设置换三张托管方式" value={activeAutoExchangeThree} onChange={changeAutoExchangeThree} /></label>}<div className="setting-row"><span><strong>快捷操作</strong></span><QuickControlButtons value={snapshot?.quickControls ?? quickPreferences} onChange={changeQuickControls} settings /></div><div className="setting-row"><span><strong>听牌辅助</strong></span><button className={`switch ${riichiHints ? 'on' : ''}`} role="switch" aria-checked={riichiHints} aria-label="设置听牌辅助" onClick={() => setRiichiHints(!riichiHints)}><span /></button></div><div className="setting-row auto-sort-setting"><span><strong>自动理牌</strong></span><button className={`switch ${autoSort ? 'on' : ''}`} role="switch" aria-checked={autoSort} aria-label="设置自动理牌" onClick={() => setAutoSort(!autoSort)}><span /></button></div><label className="setting-row"><span><strong>电脑出牌节奏</strong></span><select aria-label="电脑出牌节奏" value={speed} onChange={event => setSpeed(Number(event.target.value))}><option value="250">利落 · 0.25 秒</option><option value="650">舒适 · 0.65 秒</option><option value="1100">从容 · 1.1 秒</option></select></label><label className="setting-row"><span><strong>声音总开关</strong></span><button className={`switch ${sound ? 'on' : ''}`} role="switch" aria-checked={sound} aria-label="声音总开关" onClick={() => setSound(!sound)}><span /></button></label><div className="audio-controls"><VolumeSlider label="总音量" value={masterVolume} onChange={setMasterVolume} disabled={!sound} /><VolumeSlider label="动作音量" value={effectsVolume} onChange={setEffectsVolume} disabled={!sound} /><VolumeSlider label="环境音量" value={ambienceVolume} onChange={setAmbienceVolume} disabled={!sound} /><div className="audio-controls-footer"><button className="effect-preview-button" disabled={!sound || masterVolume === 0 || effectsVolume === 0} onClick={() => audioRef.current?.preview()}>试听牌声</button></div></div><div className="setting-row bgm-setting"><span><strong>背景音乐</strong></span><button className={`switch ${bgm ? 'on' : ''}`} role="switch" aria-checked={bgm} aria-label="背景音乐" onClick={() => setBgm(!bgm)}><span /></button></div><div className="music-volume"><VolumeSlider label="音乐音量" value={musicVolume} onChange={setMusicVolume} disabled={!sound || !bgm} /></div><div className="setting-row"><span><strong>和牌特效</strong></span><div className="effect-setting-actions"><button className="effect-preview-button" disabled={!winEffects} onClick={() => { audioRef.current?.previewWin('yakuman'); setPanel(null); setCelebration({ id: `preview-${Date.now()}`, tier: 3, title: '役 满', subtitle: '', playerName: '你', preview: true }); }}>预览特效</button><button className={`switch ${winEffects ? 'on' : ''}`} role="switch" aria-checked={winEffects} aria-label="和牌特效" onClick={() => { setWinEffects(!winEffects); if (winEffects) setCelebration(null); }}><span /></button></div></div><div className="settings-theme"><strong>牌桌主题</strong><ThemePicker value={themeId} pixel={pixelMode} onChange={setThemeId} /></div><DataBackupControls prepareExport={prepareBackup} onRestored={finishDataRestore} onRecoveryRequired={requireDataRecovery} /><label className="seed-field"><strong>下一场的随机种子</strong><input value={seed} onChange={event => setSeed(event.target.value)} placeholder="留空使用新牌山" maxLength={80} /></label>{session && <div className="settings-bottom"><button className="text-button" onClick={exportReplay}><Icon name="download" />导出牌谱</button><button className="text-button" onClick={leaveTable}><Icon name="home" />保存并返回大厅</button></div>}</> : <><p className="panel-intro">{activeMode.name} · {activeDifficulty.label}<br />种子 <code>{snapshot?.seed ?? '—'}</code></p><div className="log-list">{snapshot?.log.map(entry => <div key={entry.id}><span>{String(entry.id).padStart(3, '0')}</span><p>{displayScoringText(entry.text, snapshot?.mode, scoringPlayers)}</p></div>)}<div ref={logEnd} /></div><button className="text-button" onClick={exportReplay}><Icon name="download" />导出牌谱</button></>}
     </section></div>}
-    {showRivers && snapshot && <RiverOverview snapshot={snapshot} theme={theme} highlightedTile={highlightedTile} onClose={() => setShowRivers(false)} />}
+    {showRivers && snapshot && <RiverOverview snapshot={snapshot} theme={theme} highlightedTile={highlightedTile} initialSeat={typeof showRivers === 'object' ? showRivers.seat : undefined} onClose={() => setShowRivers(false)} />}
     {experiencePanel === 'library' && <ReplayLibrary theme={theme} onClose={() => setExperiencePanel(null)} />}
     {experiencePanel === 'stats' && <ExperienceDialog title="本地战绩" onClose={() => setExperiencePanel(null)}><StatsPanel onLibrary={() => openExperience('library')} /></ExperienceDialog>}
     {experiencePanel === 'help' && <ExperienceDialog title="新手帮助" onClose={() => setExperiencePanel(null)}><HelpCenter key={helpLesson} initialLesson={helpLesson} mode={activeMode.id} theme={theme} rules={ruleNotes} sichuanRules={isSichuan ? ruleNotes : undefined} sichuanVersion={isSichuan ? activeSichuanOptions.version : undefined} onRules={() => { setExperiencePanel(null); setPanel('rules'); }} /></ExperienceDialog>}
     {recoveryBackup && <DataRecoveryDialog backupText={recoveryBackup} onRestored={finishDataRestore} />}
     {unsavedNext && <div className="storage-warning"><ExperienceDialog title="本地记录未能保存" onClose={() => setUnsavedNext(null)}><p>牌谱或存档未能写入本地。继续后仍可游戏，但关闭或刷新页面可能丢失未保存的记录。</p><div className="storage-warning-actions"><button className="action-button pass-button" type="button" onClick={() => setUnsavedNext(null)}>留在结算页</button><button className="primary-button" type="button" onClick={() => dispatch(unsavedNext, true)}>继续下一局</button></div></ExperienceDialog></div>}
     {feedbackEvent && snapshot && roundPresentation.phase?.kind !== 'reveal' && <WinFeedback key={feedbackEvent.id} event={feedbackEvent} snapshot={snapshot} reduced={reducedMotion || !winEffects} onDone={() => setFeedbackEvent(null)} />}
-    {celebration && roundPresentation.phase?.kind !== 'reveal' && <WinCelebration effect={celebration} reduced={reducedMotion} dismiss={() => setCelebration(null)} />}
+    {celebration && roundPresentation.phase?.kind !== 'reveal' && <WinCelebration effect={celebration} pixel={pixelMode} reduced={reducedMotion} dismiss={() => setCelebration(null)} />}
     {notice && <div className="toast" role="status">{notice}</div>}
-  </div>;
+    {pixelMode && <PixelHintLayer />}
+  </div></GameHints.Provider>;
 }

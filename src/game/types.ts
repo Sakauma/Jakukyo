@@ -12,7 +12,8 @@ export interface HandTile {
   drawn: boolean;
 }
 export interface DiscardTile { tile: TileCode; riichi: boolean; called: boolean; tsumogiri: boolean }
-export interface MeldView { id: string; tiles: TileCode[]; concealed: boolean; type: 'chi' | 'pon' | 'kan'; from?: number }
+export interface MeldView { id: string; tiles: TileCode[]; concealed: boolean; type: 'chi' | 'pon' | 'kan'; from?: number;
+  /** Public index of the discard in tiles, retained if a pon is extended. */ calledIndex?: number }
 export interface PlayerView {
   id: number;
   name: string;

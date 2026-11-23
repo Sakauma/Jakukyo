@@ -3,6 +3,7 @@ import { AI_VERSION, resolveAutoPlayDifficulty, validDifficulty } from './ai/typ
 import type { BotAction, BotDecision, Difficulty } from './ai/types';
 import { createBotObservation } from './ai/observation';
 import { chooseRiichiAction } from './ai/riichi';
+import { meldView } from './meldView';
 import { chooseLegacyAction } from './ai/legacy';
 import { BotDecisionService } from './ai/service';
 import { TanyaoDecisionService } from './ai/tanyaoService';
@@ -14,7 +15,7 @@ import { chooseQuickAction, DEFAULT_QUICK_CONTROLS, updateQuickControls } from '
 import { appendReplayDecision, appendReplayFrame, finishReplayFrames, MAX_REPLAY_STEPS, validateReplayData, yieldReplayWork } from './replaySupport';
 import { newEndlessSessionId } from './endlessCheckpoint';
 import type {
-  ActionType, EndlessCheckpoint, GameLogEntry, GameSnapshot, HandTile, LegalAction, MeldView,
+  ActionType, EndlessCheckpoint, GameLogEntry, GameSnapshot, HandTile, LegalAction,
   ReplayData, RiichiSessionAPI, RoundResult, SavedGame, SessionOptions, WinnerView, ConfirmedWinEvent,
   QuickControls, ReplayCaptureOptions, ReplayFrame, RonNotice, BotReplayDecision,
 } from './types';
@@ -49,11 +50,6 @@ function handTiles(hand: Core): HandTile[] {
   const tiles = parseTiles(hand.toString());
   const hasDraw = hand._zimo && hand._zimo.length === 2;
   return tiles.map((tile, i) => ({ id: `hand-${i}-${tile}`, tile, label: tileLabel(tile), drawn: Boolean(hasDraw && i === tiles.length - 1) }));
-}
-function meldView(meld: string, id: string): MeldView {
-  const tiles = (meld.match(/\d/g) || []).map(number => meld[0] + number);
-  const concealed = !/[+=-]/.test(meld);
-  return { id, tiles, concealed, type: tiles.length === 4 ? 'kan' : new Set(tiles.map(normalize)).size === 1 ? 'pon' : 'chi' };
 }
 function randomFromSeed(seed: string): () => number {
   let value = 2166136261;
@@ -435,12 +431,8 @@ export class RiichiSession implements RiichiSessionAPI {
       const delta = [0, 0, 0, 0];
       data.fenpei.forEach((points: number, seat: number) => { delta[board.player_id[seat]] = points; });
       const tiles = parseTiles(data.shoupai);
-      const melds = data.shoupai.split(',').slice(1).map((meld: string, index: number) => {
-        const view = meldView(meld, `${id}-win-meld-${index}`);
-        const direction = meld.match(/[+=-]/)?.[0];
-        if (direction) view.from = board.player_id[(data.l + '_+=-'.indexOf(direction)) % 4];
-        return view;
-      });
+      const melds = data.shoupai.split(',').slice(1).map((meld: string, index: number) =>
+        meldView(meld, `${id}-win-meld-${index}`, data.l, board.player_id));
       const winner: WinnerView = { playerId: id!, fromId, fu: data.fu || 0, han: data.fanshu || 0, points: data.defen, yakuman: data.damanguan || 0, yaku: (data.hupai || []).map((yaku: Core) => ({ name: yaku.name, han: yaku.fanshu })), hand: tiles, winningTile: tiles[tiles.length - 1], melds, payments: [...delta] };
       if (this.result?.kind === 'win') {
         this.result.winners.push(winner);
@@ -574,7 +566,7 @@ export class RiichiSession implements RiichiSessionAPI {
       return { id, name: NAMES[id], wind: WINDS[seat], points: publicModel.defen[id], dealer: seat === 0, riichi: hand.lizhi, isHuman: id === 0,
         hand: id === 0 ? handTiles(hand) : [], concealedCount: hand._bingpai._ + parseTiles(hand.toString()).length,
         discards: board.he[seat]._pai.map((tile: string) => ({ tile: tile.slice(0, 2), riichi: tile.includes('*'), called: /[+=-]$/.test(tile), tsumogiri: tile.includes('_') })),
-        melds: hand._fulou.map((meld: string, index: number) => meldView(meld, `${id}-meld-${index}`)),
+        melds: hand._fulou.map((meld: string, index: number) => meldView(meld, `${id}-meld-${index}`, seat, board.player_id)),
         ...(revealed && id !== 0 ? { revealedHand: parseTiles(hand.toString()) } : {}),
       };
     });

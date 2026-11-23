@@ -1,0 +1,24 @@
+/* A call uses the same footprint as the seat's wind, never the river. */
+.app:not(.pixel-mode) :is(.seat-avatar,.my-avatar) { position:relative; }
+.classic-declaration {
+  pointer-events:none; position:absolute; inset:-2px; display:grid; place-items:center;
+  background:var(--panel,#25362e); color:var(--gold,#e8cf8d); border:1px solid currentColor;
+  border-radius:inherit; box-shadow:0 2px 4px #101a1660,inset 0 0 0 2px var(--panel,#25362e);
+  white-space:nowrap; font:700 24px/1 "KaiTi","STKaiti",serif;
+  animation:classic-declare var(--call-time) linear both;
+}
+.classic-declaration:is([data-call="riichi"],[data-call="kita"]) { font-size:16px; }
+@keyframes classic-declare {
+  0%,86% { opacity:1; }
+  100% { opacity:0; }
+}
+@media (prefers-reduced-motion:reduce) { .classic-declaration { display:none; } }
+
+/* Park the controls on the wooden rail, not against the exposed tile faces. */
+@media (min-width:1000px) {
+  .app.is-playing:not(.pixel-mode) .table-tools { bottom:6px; }
+}
+.meld-inspection-key { position:absolute; left:0; top:0; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); pointer-events:none; }
+.meld-source-hint { position:fixed; z-index:45; pointer-events:none; max-width:calc(100vw - 12px); padding:5px 10px; border:1px solid var(--border-color); border-radius:4px; background:var(--panel); color:var(--cream); font-size:14px; line-height:1.5; box-shadow:0 2px 7px #0005; }
+.meld-source-hint[hidden] { display:none; }
+.pixel-mode .meld-source-hint { border:1px solid var(--gold); box-shadow:var(--pixel-shadow); }

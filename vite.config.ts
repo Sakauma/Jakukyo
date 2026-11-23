@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
   base: './',
   build: {
     chunkSizeWarningLimit: 1200,
-    ...(mode === 'offline' ? {
+    ...(mode === 'offline' || mode === 'claim-preview' ? {
       assetsInlineLimit: Number.MAX_SAFE_INTEGER,
       cssCodeSplit: false,
       modulePreload: false,

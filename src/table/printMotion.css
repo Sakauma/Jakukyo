@@ -1,0 +1,121 @@
+/* All poses below are held, not sampled from a floating point tween. The type
+   and tile artwork never rotate or scale. The button hit boxes never animate. */
+.pixel-hand-pose { display: block; pointer-events: none; }
+.pixel-mode .pixel-hand-rack {
+  --shelf-ink: var(--surface);
+  background: var(--panel);
+  box-shadow: inset 0 2px var(--shelf-ink), inset 0 -3px var(--shelf-ink), inset 0 -4px var(--border-color);
+}
+.pixel-mode .pixel-hand-face {
+  border: 1px solid var(--pixel-night); border-bottom: 5px solid #ae9674;
+  box-shadow: inset 2px 2px #fff8dd, inset -2px -2px #dfc7a0, 0 2px var(--pixel-night);
+}
+.pixel-mode .pixel-hand-tile[aria-pressed=true] .pixel-hand-face {
+  border-bottom-color: var(--hand-trim); outline-color: var(--gold);
+}
+.print-call {
+  display: inline-grid; position: relative; place-items:center; flex:none;
+  height: 24px; min-width: 28px; padding-inline: 6px; margin-inline: 2px;
+  color: #fff5d4; background: #993d3f; border: 2px solid #512e34;
+  box-shadow: inset 0 0 0 1px #df9072, 2px 2px #25333a;
+  line-height: 16px; pointer-events: none;
+}
+.print-call::before, .print-call::after {
+  content:''; position:absolute; width:3px; height:2px; background:#f8c598;
+}
+.print-call::before { left:2px; top:1px; }
+.print-call::after { right:2px; bottom:1px; }
+.field-heading .print-call { z-index:2; }
+.desk-river-meta .print-call { height:20px; min-width:22px; padding-inline:4px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pixel-hand-pose[data-print-draw] { animation:print-draw var(--print-travel) step-end both; }
+  @keyframes print-draw {
+    0% { transform: translate(16px,-4px); }
+    22% { transform: translate(12px,-6px); }
+    43% { transform: translate(6px,-4px); }
+    65% { transform: translate(-2px,0); }
+    83%,100% { transform: none; }
+  }
+  :is(.field-river,.desk-river-seat)[data-side="0"] { --cast-x:0px; --cast-y:16px; }
+  :is(.field-river,.desk-river-seat)[data-side="1"] { --cast-x:16px; --cast-y:0px; }
+  :is(.field-river,.desk-river-seat)[data-side="2"] { --cast-x:0px; --cast-y:-16px; }
+  :is(.field-river,.desk-river-seat)[data-side="3"] { --cast-x:-16px; --cast-y:0px; }
+  .indexed-discard[data-print-discard] { z-index:2; animation:print-discard var(--print-travel) step-end both; }
+  @keyframes print-discard {
+    0% { transform: translate(var(--cast-x),calc(var(--cast-y) - 8px)); }
+    22% { transform: translate(calc(var(--cast-x) * .75),calc(var(--cast-y) * .75 - 10px)); }
+    48% { transform: translate(calc(var(--cast-x) * .375),calc(var(--cast-y) * .375 - 8px)); }
+    71% { transform: translate(calc(var(--cast-x) * .125),calc(var(--cast-y) * .125 - 4px)); }
+    88% { transform: translate(0,-2px); }
+    100% { transform: none; }
+  }
+  .print-contact { position:absolute; inset:auto 0 0; height:2px; pointer-events:none; }
+  .print-contact::before,.print-contact::after {
+    content:''; position:absolute; top:0; width:2px; height:2px;
+    background:#ffe3a3; box-shadow: 2px 0 #825334, -2px -2px #ffe3a3, -4px -4px #f1b665;
+    animation:print-strike 150ms var(--print-travel) step-end both;
+  }
+  .print-contact::before { left:2px; }
+  .print-contact::after { right:2px; scale:-1 1; }
+  @keyframes print-strike {
+    0% { visibility:hidden; }
+    1% { visibility:visible; transform:translate(0,0); }
+    39% { transform:translate(-2px,-2px); }
+    70% { background:transparent; box-shadow:-4px -4px #f1b665; transform:translate(-4px,-2px); }
+    100% { visibility:hidden; }
+  }
+  .print-call { animation:print-call var(--print-life) step-end both; }
+  @keyframes print-call {
+    0% { transform:translate(-4px,-8px); }
+    13% { transform:translate(-2px,-4px); }
+    23% { transform:translate(0,2px); box-shadow:inset 0 0 0 2px #ffcf9a, 1px 1px #25333a; }
+    32%,84% { transform:none; }
+    92% { transform:translate(0,-2px); }
+    100% { visibility:hidden; }
+  }
+}
+
+.pixel-mode .win-celebration { animation:none; }
+.pixel-mode .celebration-copy { padding:12px 16px 18px; }
+.pixel-mode .celebration-copy p:empty { display:none; }
+.pixel-mode .celebration-eyebrow { margin:12px 0 2px; }
+.pixel-mode .celebration-copy h2 { margin:0 0 8px; }
+.pixel-mode .celebration-line { width:100%; }
+.print-vignette {
+  --cut-width:224px; width:var(--cut-width); height:88px; margin:auto;
+  background: url('./assets/woodcut/sparrow-flight.webp') no-repeat right top / 500% 100%;
+  image-rendering:pixelated; outline:1px solid var(--border-color);
+}
+@media(min-width:650px) and (min-height:520px) {
+  .print-vignette { --cut-width:336px; height:132px; }
+}
+@media(prefers-reduced-motion:no-preference) {
+  .pixel-mode .win-celebration:not(.reduced-motion) .celebration-copy {
+    animation:print-unseal 240ms step-end both;
+  }
+  .pixel-mode .win-celebration:not(.reduced-motion) .print-vignette {
+    animation:print-flight 760ms step-end both;
+  }
+  @keyframes print-unseal {
+    0% { transform:translateY(12px); }
+    35% { transform:translateY(6px); }
+    65% { transform:translateY(-2px); }
+    85%,100% { transform:none; }
+  }
+  @keyframes print-flight {
+    0% { background-position:0 0; }
+    19% { background-position:25% 0; }
+    40% { background-position:50% 0; }
+    63% { background-position:75% 0; }
+    78%,100% { background-position:100% 0; }
+  }
+}
+.pixel-mode .win-feedback--reduced .win-feedback-card { animation:none; }
+.pixel-mode .win-feedback-seal {
+  --dot-size:32px; color:#fff2d4; background:#993d3f;
+  border:2px solid #512e34; box-shadow:inset 0 0 0 2px #df9072, 2px 2px #202f39;
+}
+@media(prefers-reduced-motion:no-preference) {
+  .pixel-mode .win-feedback:not(.win-feedback--reduced) .win-feedback-card { animation:print-unseal 200ms step-end both; }
+}

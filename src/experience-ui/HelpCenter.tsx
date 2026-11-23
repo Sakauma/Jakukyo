@@ -14,6 +14,10 @@ const lessons = [
 
 export type HelpLessonId = (typeof lessons)[number]['id'];
 
+function DesktopPixelHelp({ theme }: { theme: TableTheme }) {
+  return theme.pixel ? <p>桌上牌河每行六张，金色是上一打。选一张手牌可对照同种牌；点击任意一家牌河就能放大。右上角「读牌」看听牌分析，「菜单」里可以理牌、托管和设置。</p> : null;
+}
+
 const basicYaku = [
   ['役牌', '1 番／组', '白、發、中，或自己的门风、当前圈风的刻子。可以鸣牌。'],
   ['立直', '1 番', '门前清听牌时宣告，支付 1,000 点。通常只能打出之后摸入的牌。'],
@@ -78,7 +82,7 @@ function RegionalHelp({ mode, theme, onRules, rules, version }: { mode: ModeId; 
     <nav className="help-lessons" aria-label="帮助主题">{tabs.map(tab => <button type="button" key={tab.id} className={page === tab.id ? 'is-selected' : ''} aria-pressed={page === tab.id} onClick={() => setPage(tab.id)}><strong>{tab.name}</strong></button>)}</nav>
     <div className="help-content">
       {page === 'controls' && <>
-        <div className="help-lead"><h3>{sichuan ? '先定缺，再和牌。' : '摸牌、出牌，凑成和牌形。'}</h3><p>你坐在牌桌下方。点击手牌选中，再点一次、按 Enter，或使用“打出”按钮。</p></div>
+        <div className="help-lead"><h3>{sichuan ? '先定缺，再和牌。' : '摸牌、出牌，凑成和牌形。'}</h3><p>你坐在牌桌下方。点击手牌选中，再点一次、按 Enter，或使用“打出”按钮。</p><DesktopPixelHelp theme={theme} /></div>
         <section className="help-illustrated" aria-label={`${activeMode.name}基础和牌图解`}>
           <h4>{profile.sets === 5 ? '五组面子，加一个对子' : '四组面子，加一个对子'}</h4>
           <div className="help-tile-groups">{[...groups, ['p2', 'p2']].map((tiles, index) => <div key={index}><div>{tiles.map((tile, at) => <TilePortrait key={at} tile={tile} theme={theme} />)}</div><small>{index === groups.length ? '对子' : needsOpen && index === 0 ? '明顺 · 开门' : '面子'}</small></div>)}</div>
@@ -107,7 +111,7 @@ export function HelpCenter({ mode, theme, onRules, initialLesson = 'controls', s
     <nav className="help-lessons" aria-label="帮助主题">{lessons.map(item => <button type="button" key={item.id} aria-pressed={lesson === item.id} className={lesson === item.id ? 'is-selected' : ''} onClick={() => setLesson(item.id)}><strong>{item.name}</strong></button>)}</nav>
     <div className="help-content">
       {lesson === 'controls' && <>
-        <div className="help-lead"><h3>选牌，再出牌。</h3><p>你坐在牌桌下方。轮到你时，点击一张 3D 手牌，再点一次、按 Enter，或使用“打出”按钮。</p></div>
+        <div className="help-lead"><h3>选牌，再出牌。</h3><p>{theme.pixel ? '牌桌下方是你的正面手牌。右端隔开的是新摸的牌。轮到你时，点一张牌会抬起，再点一次、按 Enter，或按“打出”确认。也可以把牌向上拖到桌内，松手打出。' : '你坐在牌桌下方。轮到你时，点击一张 3D 手牌，再点一次、按 Enter，或使用“打出”按钮。'}</p><DesktopPixelHelp theme={theme} /></div>
         <IllustratedGuide theme={theme} mode={activeMode.id} />
         <ol className="help-steps"><li><strong>在大厅选桌</strong><p>选择玩法、电脑难度和对局长度。刚开始可用“标准”难度与“单局练习”。</p></li><li><strong>看清当前操作</strong><p>桌面下方只显示当前规则允许的吃、碰、杠、立直和和牌。出现多种吃法时，按钮上会显示具体牌组；“跳过”可放弃本次响应。</p></li><li><strong>用好辅助工具</strong><p>“理牌”整理一次，“自动理牌”保持排序；新摸入的牌独立在右侧。立直辅助可查看选定弃牌后的听张、公开未见数和振听原因。</p></li><li><strong>和牌后查看明细</strong><p>短提示之后进入结算页，可查看完整牌型、役种和{activeMode.players === 3 ? '三家' : '四家'}收支。“跳过动画”只跳过演出，下一局仍由你手动开始。</p></li></ol>
         <div className="help-keyboard"><span><kbd>←</kbd><kbd>→</kbd>切换选牌</span><span><kbd>Enter</kbd>打出已选牌</span><span><kbd>Esc</kbd>取消选牌／跳过结算动画</span></div>

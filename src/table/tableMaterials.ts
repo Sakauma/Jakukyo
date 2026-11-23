@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { TableTheme } from './themes';
-import { contactTexture, tileSurface } from './tileTextures';
+import { themeArtKey } from './themes';
+import { contactTexture, pixelBackTexture, tileSurface } from './tileTextures';
 
 /** Two draw groups: the continuous engraved front and all five ivory sides. */
-function createTileBody() {
-  const original = new RoundedBoxGeometry(.55, .77, .30, 3, .045);
+function createTileBody(original: THREE.BufferGeometry) {
   const geometry = new THREE.BufferGeometry();
   const front = original.groups[4], others = original.groups.filter((_, index) => index !== 4);
   const groups = [front, ...others];
@@ -24,9 +24,12 @@ function createTileBody() {
   return geometry;
 }
 
-export const tileBody = createTileBody();
+export const tileBody = createTileBody(new RoundedBoxGeometry(.55, .77, .30, 3, .045));
 export const tileBack = new RoundedBoxGeometry(.548, .768, .14, 3, .036);
 tileBack.clearGroups(); tileBack.translate(0, 0, -.14);
+export const pixelTileBody = createTileBody(new THREE.BoxGeometry(.55, .77, .30).toNonIndexed());
+export const pixelTileBack = new THREE.BoxGeometry(.548, .768, .14);
+pixelTileBack.clearGroups(); pixelTileBack.addGroup(0, 30, 0); pixelTileBack.addGroup(30, 6, 1); pixelTileBack.translate(0, 0, -.14);
 export const contactPlane = new THREE.PlaneGeometry(1, 1);
 /** Flat, bright rim follows the tile face; it never changes a river tile's pose. */
 function createTileMatchOutline() {
@@ -54,14 +57,17 @@ export const handHitGeometry = new THREE.BoxGeometry(1, 1, 1);
 export const handHitMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, colorWrite: false, depthWrite: false });
 export const tableBody = new RoundedBoxGeometry(14.15, .72, 13.55, 3, .19);
 export const tableInlay = new RoundedBoxGeometry(13.56, .14, 12.96, 3, .075);
-export const tableFelt = new RoundedBoxGeometry(13.36, .12, 12.76, 3, .055);
+export const FELT_HALF_X=6.68, FELT_HALF_Z=6.38;
+export const tableFelt = new RoundedBoxGeometry(2*FELT_HALF_X, .12, 2*FELT_HALF_Z, 3, .055);
 export const longRail = new RoundedBoxGeometry(13.7, .3, .37, 3, .11);
 export const shortRail = new RoundedBoxGeometry(12.93, .3, .37, 3, .11);
 export const centerBase = new RoundedBoxGeometry(2.58, .2, 2.58, 3, .07);
 for (const geometry of [tableBody, tableInlay, tableFelt, longRail, shortRail, centerBase]) geometry.clearGroups();
 
-const palettes = new Map<string, { ivory: THREE.MeshPhysicalMaterial; back: THREE.MeshPhysicalMaterial; selected: THREE.MeshPhysicalMaterial; marker: THREE.MeshBasicMaterial }>();
-const faces = new Map<string, THREE.MeshPhysicalMaterial>();
+type BodyMaterial = THREE.MeshPhysicalMaterial | THREE.MeshLambertMaterial;
+const palettes = new Map<string, { ivory: BodyMaterial; back: BodyMaterial; selected: BodyMaterial; marker: THREE.MeshBasicMaterial }>();
+const faces = new Map<string, THREE.MeshPhysicalMaterial | THREE.MeshBasicMaterial>();
+const backPrints = new Map<string, THREE.MeshBasicMaterial>();
 let contact: THREE.MeshBasicMaterial | undefined;
 const restHeights = new Map<string, number>();
 const hitBounds = new Map<string, { position: [number, number, number]; size: [number, number, number] }>();
@@ -86,6 +92,7 @@ export function alignHandHitBox(target: THREE.Object3D, slot: [number, number, n
   target.position.set(visualX + bounds.position[0], bounds.position[1], slot[2] + bounds.position[2]);
 }
 
+export const FELT_TOP = .086;
 /** Rest on the cloth using actual rotated vertices, including the rounded back cap. */
 export function tileRestHeight(rotation: [number, number, number], scale: number) {
   const key = `${rotation.join(':')}:${scale}`;
@@ -98,30 +105,35 @@ export function tileRestHeight(rotation: [number, number, number], scale: number
         point.fromBufferAttribute(positions, index).applyMatrix4(transform); minimum = Math.min(minimum, point.y);
       }
     }
-    restHeights.set(key, .086 - minimum * scale);
+    restHeights.set(key, FELT_TOP - minimum * scale);
   }
   return restHeights.get(key)!;
 }
 
-export function tileMaterials(theme: TableTheme, code?: string, faded = false, river = false) {
-  const key = `${theme.id}:${faded}:${river}`;
+export function tileMaterials(theme: TableTheme, code?: string, faded = false, river = false, readTurns = 0, quietRim = false) {
+  const key = `${themeArtKey(theme)}:${faded}:${river}:${quietRim}`;
   if (!palettes.has(key)) {
-    const ivory = new THREE.MeshPhysicalMaterial({
-      color: faded ? river ? '#efede5' : '#c8c4b7' : theme.tileFace, roughness: .27, metalness: 0,
-      clearcoat: .48, clearcoatRoughness: .2, ior: 1.48, envMapIntensity: .72,
+    // Both long ivory stripes (wall and closed opponent rack) recede.
+    // The dora face and all revealed/owned hands keep their reading contrast.
+    const edge=quietRim ? new THREE.Color(theme.tileFace).lerp(new THREE.Color(theme.tileBack),theme.pixel ? .48 : .42) : theme.tileFace;
+    const ivory = theme.pixel ? new THREE.MeshLambertMaterial({ color: faded ? '#cdc8b7' : edge }) : new THREE.MeshPhysicalMaterial({
+      color: faded ? river ? '#efede5' : '#c8c4b7' : edge, roughness: quietRim ? .68 : .27, metalness: 0,
+      clearcoat: quietRim ? .10 : .48, clearcoatRoughness: .2, ior: 1.48, envMapIntensity: quietRim ? .42 : .72,
     });
-    const back = new THREE.MeshPhysicalMaterial({ color: theme.tileBack, roughness: .3, metalness: 0, clearcoat: .5, clearcoatRoughness: .23, ior: 1.46, envMapIntensity: .65 });
+    const back = theme.pixel ? new THREE.MeshLambertMaterial({ color: theme.tileBack }) : new THREE.MeshPhysicalMaterial({ color: theme.tileBack, roughness: .3, metalness: 0, clearcoat: .5, clearcoatRoughness: .23, ior: 1.46, envMapIntensity: .65 });
     const selected = back.clone(); selected.color.set(theme.trim);
     const marker = new THREE.MeshBasicMaterial({ color: theme.ui.accent, transparent: true, opacity: .78, depthWrite: false });
     palettes.set(key, { ivory, back, selected, marker });
   }
   const palette = palettes.get(key)!;
-  let face = palette.ivory;
+  let face: THREE.Material = palette.ivory;
   if (code) {
-    const faceKey = `${key}:${code}`;
+    const faceKey = `${key}:${code}${theme.pixel && river ? ':' + readTurns : ''}`;
     if (!faces.has(faceKey)) {
-      const surface = tileSurface(code, theme);
-      faces.set(faceKey, new THREE.MeshPhysicalMaterial({
+      const surface = tileSurface(code, theme, river, readTurns);
+      faces.set(faceKey, theme.pixel ? new THREE.MeshBasicMaterial({
+        map: surface.map, color: faded ? river ? '#e7e3d3' : '#b5b4a8' : '#ffffff', toneMapped: false,
+      }) : new THREE.MeshPhysicalMaterial({
         map: surface.map, bumpMap: surface.bump, bumpScale: .009,
         roughnessMap: surface.roughness, roughness: river ? .82 : .64,
         color: faded ? river ? '#f1efe9' : '#c3c0b5' : '#ffffff', metalness: 0,
@@ -132,5 +144,10 @@ export function tileMaterials(theme: TableTheme, code?: string, faded = false, r
     face = faces.get(faceKey)!;
   }
   contact ??= new THREE.MeshBasicMaterial({ map: contactTexture(), transparent: true, depthWrite: false, opacity: .65, toneMapped: false });
+  if (theme.pixel) {
+    if (!backPrints.has(theme.id)) backPrints.set(theme.id, new THREE.MeshBasicMaterial({ map: pixelBackTexture(theme), toneMapped:false }));
+    const print = backPrints.get(theme.id)!;
+    return { ...palette, back: [palette.back, print], selected: [palette.selected, print], body: [palette.ivory, face], contact };
+  }
   return { ...palette, body: [palette.ivory, face], contact };
 }

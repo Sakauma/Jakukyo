@@ -33,7 +33,7 @@ export function TableCelebration({ effect, theme }: { effect: WinEffect; theme: 
     }
   });
   return <group>
-    <instancedMesh ref={sparks} args={[undefined, undefined, count]} frustumCulled={false}><octahedronGeometry args={[1, 0]} /><meshStandardMaterial color={theme.ui.accent} emissive={theme.ui.accent} emissiveIntensity={1.2} roughness={.3} /></instancedMesh>
-    <mesh ref={ring} position={[0, .22, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.5, 1.56, 96]} /><meshBasicMaterial color={theme.ui.accent} transparent opacity={.3} depthWrite={false} side={THREE.DoubleSide} /></mesh>
+    <instancedMesh ref={sparks} args={[undefined, undefined, count]} frustumCulled={false}>{theme.pixel ? <boxGeometry args={[1.5, 1.5, 1.5]} /> : <octahedronGeometry args={[1, 0]} />}<meshStandardMaterial color={theme.ui.accent} emissive={theme.ui.accent} emissiveIntensity={1.2} roughness={.3} /></instancedMesh>
+    <mesh ref={ring} position={[0, .22, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[1.5, 1.56, theme.pixel ? 8 : 96]} /><meshBasicMaterial color={theme.ui.accent} transparent opacity={.3} depthWrite={false} side={THREE.DoubleSide} /></mesh>
   </group>;
 }

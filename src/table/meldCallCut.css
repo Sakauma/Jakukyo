@@ -1,0 +1,49 @@
+@font-face {
+  font-family:"Jakukyo Call Brush";
+  src:url('../assets/meld-brush.woff2') format('woff2');
+  font-weight:400;
+  font-display:swap;
+  unicode-range:U+5403,U+6760,U+78B0;
+}
+.meld-call-layer {position:absolute; inset:0; overflow:hidden; pointer-events:none; user-select:none;}
+.meld-call-cut {
+  --ink-accent:#d7b372; position:absolute; top:0; left:0; width:74px; height:48px;
+  pointer-events:none; contain:layout paint; isolation:isolate;
+}
+.meld-call-cut[hidden] {display:none;}
+.meld-call-cut[data-call="chi"] {--ink-accent:#afcfad;}
+.meld-call-cut[data-call="kan"] {--ink-accent:#e5af72;}
+.call-sumi,.call-woodcut {position:absolute; inset:0; width:100%; height:100%; color:var(--ink-accent); clip-path:inset(0 var(--brush-crop,0%) 0 0);}
+.call-word {
+  position:absolute; left:15px; top:0; width:44px; text-align:center;
+  color:#fff1cd; font:400 42px/46px "Jakukyo Call Brush","KaiTi",serif;
+  -webkit-text-stroke:1.7px #382b25; paint-order:stroke fill;
+  text-shadow:0 2px 0 #382b25; transform:translate(var(--strike-x,0px),var(--strike-y,0px));
+}
+.call-signature {
+  position:absolute; left:57px; top:29px; width:7px; height:8px;
+  background:#a54a3d; border:1px solid #e4a47c; transform:rotate(-7deg); opacity:var(--seal,0);
+}
+.call-signature::after {content:""; position:absolute; inset:1px; background:#ffe1b4;
+  clip-path:polygon(0 20%,40% 35%,70% 0,100% 0,67% 55%,100% 50%,75% 78%,35% 78%,0 100%,25% 62%);}
+.call-woodcut {display:none;}
+/* A carved tail and a two-dot chop. The letter is the same native Unifont
+ * strike as the rack and table headings, shown at an integer 2x. */
+.pixel-mode .meld-call-cut {width:54px; height:36px;}
+.pixel-mode .call-sumi {display:none;}
+.pixel-mode .call-woodcut {display:block;}
+.pixel-mode .call-woodcut::before,.pixel-mode .call-woodcut::after {content:"";position:absolute;inset:0;}
+.pixel-mode .call-woodcut::before {
+  background:#193735;
+  clip-path:polygon(0 26px,8px 26px,8px 22px,16px 22px,16px 18px,22px 18px,22px 12px,32px 12px,32px 8px,42px 8px,42px 4px,54px 4px,54px 8px,50px 8px,50px 14px,44px 14px,44px 22px,36px 22px,36px 28px,26px 28px,26px 32px,10px 32px,10px 30px,0 30px);
+}
+.pixel-mode .call-woodcut::after {background:var(--ink-accent);
+  clip-path:polygon(0 32px,8px 32px,8px 30px,16px 30px,16px 28px,24px 28px,24px 30px,18px 30px,18px 32px,10px 32px,10px 34px,0 34px);}
+.pixel-mode .call-word {
+  --dot-size:32px; --dot-tracking:0px; left:10px; top:0; width:32px;
+  line-height:34px; -webkit-text-stroke:0; color:#ffedbf;
+  text-shadow:-2px 0 #233831,0 2px #233831,2px 0 #233831,0 -2px #233831;
+}
+.pixel-mode .call-signature {left:44px; top:24px; width:6px; height:6px; border:0; transform:none; background:#b95846;}
+.pixel-mode .call-signature::after {inset:0; background:#ffe3ad; clip-path:polygon(2px 0,4px 0,4px 2px,2px 2px,2px 4px,0 4px,0 2px,2px 2px);}
+@media (prefers-reduced-motion:reduce) { .meld-call-layer {display:none;} }

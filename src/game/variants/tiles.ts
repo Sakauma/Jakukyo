@@ -1,4 +1,5 @@
 import Majiang from '@kobalab/majiang-core';
+import { flowerName } from '../flowerName';
 import type { MeldView, TileCode } from '../types';
 
 export const SUITS = ['m','p','s'];
@@ -9,7 +10,7 @@ export const tileCode = (index: number): string => 'mpsz'[Math.floor(index/9)] +
 export const isTerminal = (tile: string): boolean => tile[0] === 'z' || [1,9].includes(Number(tile[1]) || 5);
 export const is258 = (tile: string): boolean => tile[0] !== 'z' && [2,5,8].includes(Number(tile[1]) || 5);
 export function tileLabel(tile: string): string {
-  if (tile[0] === 'f') return ['','梅','兰','竹','菊','春','夏','秋','冬'][Number(tile[1])] || '花';
+  if (tile[0] === 'f') return flowerName(tile);
   if (tile[0] === 'z') return ['','东','南','西','北','白','发','中'][Number(tile[1])] || tile;
   return `${tile[1] === '0' ? '赤' : ''}${['','一','二','三','四','五','六','七','八','九'][Number(tile[1]) || 5]}${({m:'万',p:'筒',s:'条'} as Record<string,string>)[tile[0]] || ''}`;
 }

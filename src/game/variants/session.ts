@@ -478,7 +478,8 @@ export class RegionalSession implements GameSessionAPI {
     const called=replies.find(([,choice])=>choice?.type==='pon'||choice?.type==='kan')||replies.find(([,choice])=>choice?.type==='chi');
     if(called){
       const [id,choice]=called as [number,Choice];const player=this.players[id];this.players[event.from].discards.at(-1)!.called=true;this.remove(player,choice.consume!);
-      player.melds.push({id:`meld-${this.step}`,type:choice.type==='kan'?'kan':choice.type==='pon'?'pon':'chi',tiles:choice.tiles!,concealed:false,from:event.from});
+      const tiles=choice.tiles!; // Chi ranks are distinct; pon/open kan append the exact discard after the held copies.
+      player.melds.push({id:`meld-${this.step}`,type:choice.type==='kan'?'kan':choice.type==='pon'?'pon':'chi',tiles,concealed:false,from:event.from,calledIndex:tiles.lastIndexOf(event.tile)});
       this.callsMade=true;this.players.forEach(p=>p.ippatsu=false);this.turn=id;player.drawn=null;
       this.log(`${NAMES[id]}${choice.type==='chi'?'吃':choice.type==='pon'?'碰':'明杠'}${tileLabel(event.tile)}`,id,event.tile);
       if(choice.type==='kan')this.kong(id,'open',event.from);else{this.stage='discard';this.actions=this.ownChoices(player);this.refreshMcrFeatures(player);}return;

@@ -1,7 +1,9 @@
+import { useHintProps } from '../presentation/PixelHints';
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 import type { GameSnapshot, MeldView, RoundResult, RoundTransfer, ScoringEvidence, WinnerView, YakuView } from '../game/types';
 import { getMode } from '../game/catalog';
+import { meldReadingOrder } from '../game/meldView';
 import { TilePortrait } from '../table/TilePortrait';
 import { tileName } from '../table/tileTextures';
 import type { TableTheme } from '../table/themes';
@@ -78,7 +80,7 @@ function WinTiles({ winner, snapshot, theme, evidence }: { winner: WinnerView; s
 function MeldTiles({ meld, snapshot, theme, highlighted }: { meld: MeldView; snapshot: GameSnapshot; theme: TableTheme; highlighted?: number[] }) {
   const name = meld.type === 'chi' ? '吃' : meld.type === 'pon' ? '碰' : meld.concealed ? '暗杠' : '明杠';
   return <div className="settlement-meld" aria-label={`${name}${meld.from == null ? '' : `，来自${nameOf(snapshot, meld.from)}`}`}>
-    <div>{meld.tiles.map((tile, index) => <EvidenceTile key={`${index}-${tile}`} tile={tile} theme={theme} highlighted={highlighted?.includes(index)} concealed={meld.concealed && (index === 0 || index === meld.tiles.length - 1)} />)}</div>
+    <div>{meldReadingOrder(meld).map(index => <EvidenceTile key={index} tile={meld.tiles[index]} theme={theme} highlighted={highlighted?.includes(index)} concealed={meld.concealed && (index === 0 || index === meld.tiles.length - 1)} />)}</div>
     <small>{name}{meld.from != null && <span> · {nameOf(snapshot, meld.from)}</span>}</small>
   </div>;
 }
@@ -175,6 +177,7 @@ function TransferLedger({ snapshot, transfers }: { snapshot: GameSnapshot; trans
 }
 
 function ScoreCards({ snapshot, result, progress }: { snapshot: GameSnapshot; result: RoundResult; progress: number }) {
+  const hintProps = useHintProps();
   const isMatch = result.kind === 'match';
   const unit = snapshot.scoreUnit ?? (isJapanese(snapshot.mode ?? 'riichi') ? '点' : '分');
   const players = isMatch && result.ranks ? [...snapshot.players].sort((left, right) => result.ranks![left.id] - result.ranks![right.id]) : snapshot.players;
@@ -189,7 +192,7 @@ function ScoreCards({ snapshot, result, progress }: { snapshot: GameSnapshot; re
       return <article key={player.id} className={`settlement-score-card ${player.isHuman ? 'is-you' : ''} ${isMatch && rank === 1 ? 'is-first' : ''}`}>
         <header><div><span className="settlement-seat-mark">{isMatch && rank ? `#${rank}` : player.wind}</span><strong>{player.name}</strong></div>{player.isHuman && <small>你</small>}</header>
         {isMatch ? <div className="settlement-final-points"><strong>{format(after)}</strong><small>{unit}</small></div> : <>
-          <div className="settlement-score-before"><span title={isJapanese(snapshot.mode ?? 'riichi') ? '已扣除本局立直支出' : undefined}>变动前</span><b>{format(before)}</b></div>
+          <div className="settlement-score-before"><span {...hintProps(isJapanese(snapshot.mode ?? 'riichi') ? '已扣除本局立直支出' : undefined)}>变动前</span><b>{format(before)}</b></div>
           <div className={`settlement-score-change ${changeClass(delta)}`}><ScoreNumber value={delta} progress={progress} signedValue /><small>{unit}</small></div>
           <div className="settlement-score-after"><span>结算后</span><strong><ScoreNumber value={after} from={before} progress={progress} /></strong></div>
           {ready !== undefined && <span className={`settlement-ready ${ready ? 'is-ready' : ''}`}>{ready ? '听牌' : '未听牌'}</span>}
